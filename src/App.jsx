@@ -266,13 +266,14 @@ export default function App() {
     legDot: (c) => ({ width: 7, height: 7, borderRadius: "50%", background: c }),
     section: { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" },
     sectionTitle: { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 },
-    checkItem: { padding: "10px 0", borderBottom: "0.5px solid #eee" },
+    sectionCard: { border: "1px solid #e0e0e0", borderRadius: 10, padding: "0.875rem 1rem", background: "#fafafa" },
+    checkItem: { padding: "10px 0", borderBottom: "0.5px solid #e8e8e8" },
     ansRow: { display: "flex", gap: 5, flexWrap: "wrap", marginTop: 7 },
     ansBtn: (val, selected) => ({
       padding: "5px 11px", borderRadius: 20,
-      border: selected ? `2px solid ${BTN_COLORS[val].border}` : "1.5px solid #ddd",
+      border: selected ? `2px solid ${BTN_COLORS[val].border}` : "1.5px solid #bbb",
       background: selected ? BTN_COLORS[val].bg : "white",
-      color: selected ? BTN_COLORS[val].color : "#888",
+      color: selected ? BTN_COLORS[val].color : "#555",
       cursor: "pointer", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
     }),
     photoBtn: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", border: "0.5px dashed #ccc", borderRadius: 6, padding: "4px 8px", background: "none", cursor: "pointer", marginTop: 6 },
@@ -414,9 +415,9 @@ export default function App() {
       {SECTIONS.map((sec) => (
         <div key={sec.id} style={s.section}>
           <div style={s.sectionTitle}><i className={`ti ${sec.icon}`} /> {sec.title}</div>
-          {sec.items.map((item, idx) => (
-            <div key={item.id} style={{ ...s.checkItem, borderBottom: idx === sec.items.length - 1 ? "none" : "0.5px solid #eee", paddingBottom: idx === sec.items.length - 1 ? 0 : 10 }}>
-              <div style={{ fontSize: 13, marginBottom: 2 }}>{item.label}</div>
+          <div style={s.sectionCard}>
+            {sec.items.map((item, idx) => (
+              <div key={item.id} style={{ ...s.checkItem, borderBottom: idx === sec.items.length - 1 ? "none" : "0.5px solid #e8e8e8", paddingBottom: idx === sec.items.length - 1 ? 0 : 10 }}>
               <div style={{ fontSize: 11, color: "#aaa" }}>{item.sub}</div>
               <div style={s.ansRow}>
                 {["ia","sat","good","exc","na"].map((k) => (
@@ -429,13 +430,14 @@ export default function App() {
               }
             </div>
           ))}
+          </div>
         </div>
       ))}
 
       {/* SLIDER */}
       <div style={s.section}>
         <div style={s.sectionTitle}><i className="ti ti-arrows-maximize" /> Ruimte voor groei</div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <div style={s.sectionCard}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 500 }}>Beschikbare capaciteit</div>
             <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>Schat het percentage vrije opslagruimte</div>
@@ -451,12 +453,14 @@ export default function App() {
         </div>
         <textarea value={sliderRemark} onChange={(e) => setSliderRemark(e.target.value)} rows={2} placeholder="Toelichting..."
           style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontFamily: "inherit", background: "white", resize: "none", marginTop: 10 }} />
+          style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontFamily: "inherit", background: "white", resize: "none", marginTop: 10 }} />
+        </div>
       </div>
 
       {/* STOCK CHECK */}
       <div style={s.section}>
         <div style={s.sectionTitle}><i className="ti ti-barcode" /> Stock check</div>
-        <div style={{ display: "flex", marginBottom: "0.875rem", border: "0.5px solid #ddd", borderRadius: 8, overflow: "hidden" }}>
+        <div style={s.sectionCard}>
           <button style={s.stockTab(stockTab === "a")} onClick={() => setStockTab("a")}>Artikel → Bin (papier → fysiek)</button>
           <button style={{ ...s.stockTab(stockTab === "b"), borderLeft: "0.5px solid #ddd" }} onClick={() => setStockTab("b")}>Bin → Artikel (fysiek → papier)</button>
         </div>
@@ -508,15 +512,18 @@ export default function App() {
               </tbody>
             </table>
           </>
-        )}
+        </div>
+      </div>
       </div>
 
       {/* HANDTEKENINGEN */}
       <div style={s.section}>
         <div style={s.sectionTitle}><i className="ti ti-writing-sign" /> Handtekeningen</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
+        <div style={s.sectionCard}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
           <SignaturePad id="a" label="Auditor" sublabel="Naam en handtekening" />
           <SignaturePad id="b" label="Lokale contactpersoon" sublabel="Naam en handtekening" />
+          </div>
         </div>
       </div>
 
