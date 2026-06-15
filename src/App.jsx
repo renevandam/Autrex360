@@ -453,7 +453,6 @@ export default function App() {
         </div>
         <textarea value={sliderRemark} onChange={(e) => setSliderRemark(e.target.value)} rows={2} placeholder="Toelichting..."
           style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontFamily: "inherit", background: "white", resize: "none", marginTop: 10 }} />
-          style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontFamily: "inherit", background: "white", resize: "none", marginTop: 10 }} />
         </div>
       </div>
 
