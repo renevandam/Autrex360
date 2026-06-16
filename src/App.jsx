@@ -1,4 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "./lib/supabase";
+import AuthPage from "./Auth.jsx";
 
 const SCORES = { ia: 0, unsat: 1, sat: 3, good: 4, exc: 5 };
 const LABELS = { ia: "IA", unsat: "Unsat", sat: "Sat", good: "Good", exc: "Excellent", na: "N/A" };
@@ -165,6 +167,15 @@ const sec = { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" };
 const secTitle = { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 };
 
 export default function App() {
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (!session) return <AuthPage />;
   const allItemIds = SECTIONS.flatMap((s) => s.items.map((i) => i.id));
   const initState = () => Object.fromEntries(allItemIds.map((id) => [id, null]));
 
