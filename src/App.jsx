@@ -67,6 +67,19 @@ const DEFAULT_LOCATION = {
 
 const ANSWER_KEYS = ["ia", "unsat", "sat", "good", "exc", "na"];
 
+const LEGEND = [
+  ["#E24B4A","IA (0 pt)"],
+  ["#E07B3A","Unsat (1 pt)"],
+  ["#EF9F27","Sat (3 pt)"],
+  ["#639922","Good (4 pt)"],
+  ["#1D9E75","Excellent (5 pt)"],
+  ["#378ADD","N/A"],
+];
+
+const card = { border: "1px solid #e0e0e0", borderRadius: 10, padding: "0.875rem 1rem", background: "#fafafa" };
+const sec = { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" };
+const secTitle = { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 };
+
 function SignaturePad({ label, sublabel }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
@@ -98,6 +111,11 @@ function SignaturePad({ label, sublabel }) {
     initialized.current = true;
   }
 
+  useEffect(() => {
+    const timers = [50, 150, 300, 600].map((t) => setTimeout(initCanvas, t));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
   function ensureInit() { if (!initialized.current) initCanvas(); }
 
   function getPos(e) {
@@ -127,9 +145,6 @@ function SignaturePad({ label, sublabel }) {
     }
     setHasSig(false);
   }
-
-  // init on mount with retries
-  useEffect(() => { [50,150,300,600].forEach((t) => setTimeout(initCanvas, t)); }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -162,10 +177,6 @@ function SignaturePad({ label, sublabel }) {
   );
 }
 
-const card = { border: "1px solid #e0e0e0", borderRadius: 10, padding: "0.875rem 1rem", background: "#fafafa" };
-const sec = { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" };
-const secTitle = { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 };
-
 export default function App() {
   const [session, setSession] = useState(null);
 
@@ -176,9 +187,14 @@ export default function App() {
   }, []);
 
   if (!session) return <AuthPage />;
+
   const allItemIds = SECTIONS.flatMap((s) => s.items.map((i) => i.id));
   const initState = () => Object.fromEntries(allItemIds.map((id) => [id, null]));
 
+  return <AuditApp allItemIds={allItemIds} initState={initState} session={session} />;
+}
+
+function AuditApp({ allItemIds, initState, session }) {
   const [view, setView] = useState("audit");
   const [responses, setResponses] = useState(initState);
   const [photos, setPhotos] = useState({});
@@ -215,6 +231,10 @@ export default function App() {
   }
   function applyEdit() { setLocation({ ...editDraft }); setAddrChanged(true); }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+  }
+
   function reset() {
     setResponses(initState()); setPhotos({}); setSliderVal(50); setSliderRemark("");
     setStockA(ARTIKELEN.map(() => "")); setStockB(LOCATIES.map(() => ({ art: "", qty: "" })));
@@ -233,21 +253,11 @@ export default function App() {
     color: selected ? BTN_COLORS[val].color : "#555",
     cursor: "pointer", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
   });
-
   const pill = (k) => ({ fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: 20, border: `1px solid ${BTN_COLORS[k].border}`, background: BTN_COLORS[k].bg, color: BTN_COLORS[k].color });
   const stockTabStyle = (active) => ({ flex: 1, padding: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", background: active ? "#1D9E75" : "white", color: active ? "white" : "#888", border: "none" });
   const stockInput = (wide) => ({ width: wide ? 110 : 72, border: "0.5px solid #ddd", borderRadius: 5, padding: "4px 6px", fontSize: 12, background: "white", textAlign: "center" });
   const reportRow = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "5px 0", fontSize: 12, borderBottom: "0.5px solid #eee", gap: 10 };
   const reportCard = { background: "#f9f9f9", border: "0.5px solid #eee", borderRadius: 10, padding: "0.875rem 1rem", textAlign: "left", marginBottom: "0.875rem" };
-
-  const LEGEND = [
-    ["#E24B4A","IA (0 pt)"],
-    ["#E07B3A","Unsat (1 pt)"],
-    ["#EF9F27","Sat (3 pt)"],
-    ["#639922","Good (4 pt)"],
-    ["#1D9E75","Excellent (5 pt)"],
-    ["#378ADD","N/A"],
-  ];
 
   if (view === "success") {
     const verifyLabel = addrVerified ? "✓ Bevestigd" : addrChanged ? "⚠ Adres aangepast" : "Niet geverifieerd";
@@ -258,7 +268,10 @@ export default function App() {
           <div style={{ fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
             <i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360
           </div>
-          <span style={{ fontSize: 11, background: "#E1F5EE", color: "#0F6E56", padding: "3px 10px", borderRadius: 20 }}>Demo</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, color: "#888" }}>{session.user.email}</span>
+            <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }}>Uitloggen</button>
+          </div>
         </div>
         <div style={{ padding: "2.5rem 1.25rem", textAlign: "center" }}>
           <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#E1F5EE", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
@@ -266,14 +279,12 @@ export default function App() {
           </div>
           <h2 style={{ fontSize: 19, fontWeight: 500, marginBottom: 7 }}>Audit ingediend</h2>
           <p style={{ fontSize: 13, color: "#888", marginBottom: "1.25rem" }}>Het rapport is verstuurd. De stock check wordt vergeleken met het systeem.</p>
-
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Locatie</div>
             <div style={reportRow}><span style={{ color: "#888" }}>Bedrijf</span><span style={{ fontWeight: 500 }}>{location.name}</span></div>
             <div style={reportRow}><span style={{ color: "#888" }}>Adres</span><span style={{ fontWeight: 500, textAlign: "right" }}>{location.street}, {location.city}</span></div>
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Verificatie</span><span style={{ fontWeight: 500, color: verifyColor }}>{verifyLabel}</span></div>
           </div>
-
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Checklist score</div>
             {["ia","unsat","sat","good","exc"].map((k) => (
@@ -281,19 +292,16 @@ export default function App() {
             ))}
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Totaalscore</span><span style={{ fontWeight: 500, color: pctColor(pct) }}>{pct}% ({achieved}/{maxPossible} pt)</span></div>
           </div>
-
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Ruimte voor groei</div>
             <div style={reportRow}><span style={{ color: "#888" }}>Beschikbare capaciteit</span><span style={{ fontWeight: 500, color: sliderColor }}>{sliderVal}% vrij</span></div>
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Toelichting</span><span style={{ fontWeight: 500 }}>{sliderRemark || "—"}</span></div>
           </div>
-
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Stock check</div>
             <div style={reportRow}><span style={{ color: "#888" }}>Artikel → Bin</span><span style={{ fontWeight: 500 }}>{aFilled}/5 artikelen geteld</span></div>
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Bin → Papier</span><span style={{ fontWeight: 500 }}>{bFilled}/5 locaties genoteerd</span></div>
           </div>
-
           <button onClick={reset} style={{ border: "0.5px solid #ddd", background: "white", borderRadius: 8, padding: "9px 18px", fontSize: 13, cursor: "pointer" }}>
             <i className="ti ti-refresh" /> Opnieuw starten
           </button>
@@ -304,8 +312,6 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" }}>
-
-      {/* HEADER */}
       <div style={{ padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <div style={{ fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
@@ -315,13 +321,12 @@ export default function App() {
             <button onClick={reset} style={{ fontSize: 12, color: "#888", border: "0.5px solid #ddd", borderRadius: 8, padding: "4px 10px", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               <i className="ti ti-refresh" style={{ fontSize: 13 }} /> Reset
             </button>
-            <span style={{ fontSize: 11, background: "#E1F5EE", color: "#0F6E56", padding: "3px 10px", borderRadius: 20 }}>Demo</span>
+            <button onClick={handleLogout} style={{ fontSize: 12, color: "#888", border: "0.5px solid #ddd", borderRadius: 8, padding: "4px 10px", background: "none", cursor: "pointer" }}>Uitloggen</button>
           </div>
         </div>
-        <div style={{ fontSize: 12, color: "#888" }}>Warehouse compliance audit · extern partner</div>
+        <div style={{ fontSize: 12, color: "#888" }}>Ingelogd als {session.user.email}</div>
       </div>
 
-      {/* LIVE SCORE */}
       <div style={{ padding: "10px 1.25rem", background: "#f9f9f9", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {["ia","unsat","sat","good","exc"].map((k) => counts[k] > 0 && (
@@ -338,7 +343,6 @@ export default function App() {
         <div style={{ height: 3, background: "#1D9E75", width: progress + "%", transition: "width 0.3s" }} />
       </div>
 
-      {/* LEGEND */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "8px 1.25rem", borderBottom: "0.5px solid #eee", background: "#f9f9f9" }}>
         {LEGEND.map(([c, l]) => (
           <div key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" }}>
@@ -347,7 +351,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* LOCATIE */}
       <div style={sec}>
         <div style={secTitle}><i className="ti ti-building-warehouse" /> Locatiegegevens</div>
         <div style={{ background: "#f9f9f9", border: "1px solid #e0e0e0", borderRadius: 10, padding: "0.875rem 1rem" }}>
@@ -383,7 +386,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* CHECKLIST */}
       {SECTIONS.map((section) => (
         <div key={section.id} style={sec}>
           <div style={secTitle}><i className={`ti ${section.icon}`} /> {section.title}</div>
@@ -407,7 +409,6 @@ export default function App() {
         </div>
       ))}
 
-      {/* SLIDER */}
       <div style={sec}>
         <div style={secTitle}><i className="ti ti-arrows-maximize" /> Ruimte voor groei</div>
         <div style={card}>
@@ -430,7 +431,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* STOCK CHECK */}
       <div style={sec}>
         <div style={secTitle}><i className="ti ti-barcode" /> Stock check</div>
         <div style={card}>
@@ -490,7 +490,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* HANDTEKENINGEN */}
       <div style={sec}>
         <div style={secTitle}><i className="ti ti-writing-sign" /> Handtekeningen</div>
         <div style={card}>
@@ -501,13 +500,11 @@ export default function App() {
         </div>
       </div>
 
-      {/* SUBMIT */}
       <div style={{ padding: "1rem 1.25rem" }}>
         <button style={{ width: "100%", padding: 11, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => setView("success")}>
           <i className="ti ti-send" /> Audit indienen
         </button>
       </div>
-
     </div>
   );
 }
