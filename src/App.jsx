@@ -12,7 +12,6 @@ const BTN_COLORS = {
 };
 
 function pctColor(pct) {
-  if (pct === null) return "#888";
   if (pct < 40) return "#A32D2D";
   if (pct < 60) return "#BA7517";
   if (pct < 80) return "#3B6D11";
@@ -198,10 +197,11 @@ export default function App() {
   const [addrChanged, setAddrChanged] = useState(false);
 
   const answered = Object.values(responses).filter((v) => v !== null);
+  const naCount = answered.filter((v) => v === "na").length;
+  const maxPossible = (allItemIds.length - naCount) * 5;
   const relevant = answered.filter((v) => v !== "na");
   const achieved = relevant.reduce((s, v) => s + SCORES[v], 0);
-  const maxPossible = relevant.length * 5;
-  const pct = maxPossible > 0 ? Math.round((achieved / maxPossible) * 100) : null;
+  const pct = Math.round((achieved / maxPossible) * 100);
   const counts = { ia: 0, sat: 0, good: 0, exc: 0, na: 0 };
   answered.forEach((v) => counts[v]++);
   const progress = Math.round((answered.length / allItemIds.length) * 100);
@@ -281,7 +281,7 @@ export default function App() {
             {["ia","sat","good","exc"].map((k) => (
               <div key={k} style={reportRow}><span style={{ color: "#888" }}>{LABELS[k]}</span><span style={{ fontWeight: 500, color: BTN_COLORS[k].color }}>{counts[k]}</span></div>
             ))}
-            <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Totaalscore</span><span style={{ fontWeight: 500, color: pctColor(pct) }}>{pct !== null ? pct + "%" : "—"} ({achieved}/{maxPossible} pt)</span></div>
+            <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Totaalscore</span><span style={{ fontWeight: 500, color: pctColor(pct) }}>{pct}% ({achieved}/{maxPossible} pt)</span></div>
           </div>
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Ruimte voor groei</div>
@@ -322,13 +322,13 @@ export default function App() {
       {/* LIVE SCORE */}
       <div style={{ padding: "10px 1.25rem", background: "#f9f9f9", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {answered.length === 0 && <span style={{ fontSize: 12, color: "#aaa" }}>Beantwoord vragen om score te zien</span>}
+          
           {["ia","sat","good","exc"].map((k) => counts[k] > 0 && (
             <span key={k} style={pill(k)}>{LABELS[k]} {counts[k]}</span>
           ))}
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 20, fontWeight: 600, color: pctColor(pct) }}>{pct !== null ? pct + "%" : "—"}</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: pctColor(pct) }}>{pct}%</div>
           <div style={{ fontSize: 11, color: "#aaa" }}>{achieved} / {maxPossible} pt</div>
         </div>
       </div>
