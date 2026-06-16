@@ -129,7 +129,7 @@ function SignaturePad({ label, sublabel }) {
   }
 
   // init on mount with retries
-  useState(() => { [50,150,300,600].forEach((t) => setTimeout(initCanvas, t)); });
+  useEffect(() => { [50,150,300,600].forEach((t) => setTimeout(initCanvas, t)); }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
