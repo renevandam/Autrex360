@@ -1,18 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 
-const SCORES = { ia: 0, sat: 1, good: 3, exc: 5 };
-const LABELS = { ia: "IA", sat: "Satisfactory", good: "Good", exc: "Excellent", na: "N/A" };
+const SCORES = { ia: 0, unsat: 1, sat: 3, good: 4, exc: 5 };
+const LABELS = { ia: "IA", unsat: "Unsat", sat: "Sat", good: "Good", exc: "Excellent", na: "N/A" };
 
 const BTN_COLORS = {
-  ia:   { bg: "#FCEBEB", border: "#E24B4A", color: "#791F1F" },
-  sat:  { bg: "#FAEEDA", border: "#EF9F27", color: "#633806" },
-  good: { bg: "#EAF3DE", border: "#639922", color: "#27500A" },
-  exc:  { bg: "#E1F5EE", border: "#1D9E75", color: "#085041" },
-  na:   { bg: "#E6F1FB", border: "#378ADD", color: "#0C447C" },
+  ia:    { bg: "#FCEBEB", border: "#E24B4A", color: "#791F1F" },
+  unsat: { bg: "#FDF0E8", border: "#E07B3A", color: "#7A3010" },
+  sat:   { bg: "#FAEEDA", border: "#EF9F27", color: "#633806" },
+  good:  { bg: "#EAF3DE", border: "#639922", color: "#27500A" },
+  exc:   { bg: "#E1F5EE", border: "#1D9E75", color: "#085041" },
+  na:    { bg: "#E6F1FB", border: "#378ADD", color: "#0C447C" },
 };
 
 function pctColor(pct) {
-  if (pct < 40) return "#A32D2D";
+  if (pct < 20) return "#A32D2D";
+  if (pct < 40) return "#C04A1A";
   if (pct < 60) return "#BA7517";
   if (pct < 80) return "#3B6D11";
   return "#085041";
@@ -61,6 +63,8 @@ const DEFAULT_LOCATION = {
   detail: "Loods 7, Unit B",
 };
 
+const ANSWER_KEYS = ["ia", "unsat", "sat", "good", "exc", "na"];
+
 function SignaturePad({ label, sublabel }) {
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
@@ -92,32 +96,23 @@ function SignaturePad({ label, sublabel }) {
     initialized.current = true;
   }
 
-  useEffect(() => {
-    [50, 150, 300, 600].forEach((t) => setTimeout(initCanvas, t));
-  }, []);
+  function ensureInit() { if (!initialized.current) initCanvas(); }
 
   function getPos(e) {
-    if (!initialized.current) initCanvas();
+    ensureInit();
     const rect = canvasRef.current.getBoundingClientRect();
     const src = e.touches ? e.touches[0] : e;
     return { x: src.clientX - rect.left, y: src.clientY - rect.top };
   }
 
   function onStart(e) {
-    e.preventDefault();
-    if (!initialized.current) initCanvas();
-    drawing.current = true;
-    const p = getPos(e);
-    ctx.current.beginPath();
-    ctx.current.moveTo(p.x, p.y);
+    e.preventDefault(); ensureInit(); drawing.current = true;
+    const p = getPos(e); ctx.current.beginPath(); ctx.current.moveTo(p.x, p.y);
   }
 
   function onMove(e) {
-    if (!drawing.current) return;
-    e.preventDefault();
-    const p = getPos(e);
-    ctx.current.lineTo(p.x, p.y);
-    ctx.current.stroke();
+    if (!drawing.current) return; e.preventDefault();
+    const p = getPos(e); ctx.current.lineTo(p.x, p.y); ctx.current.stroke();
     if (!hasSig) setHasSig(true);
   }
 
@@ -131,30 +126,19 @@ function SignaturePad({ label, sublabel }) {
     setHasSig(false);
   }
 
+  // init on mount with retries
+  useState(() => { [50,150,300,600].forEach((t) => setTimeout(initCanvas, t)); });
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
       <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
       <div style={{ fontSize: 11, color: "#888" }}>{sublabel}</div>
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Volledige naam"
-        style={{ border: "0.5px solid #ccc", borderRadius: 8, padding: "6px 10px", fontSize: 13, fontFamily: "inherit", background: "white", width: "100%" }}
-      />
-      <div
-        ref={wrapRef}
-        style={{
-          position: "relative", height: 110,
-          border: hasSig ? "1.5px solid #1D9E75" : "1.5px dashed #ccc",
-          borderRadius: 8, overflow: "hidden", cursor: "crosshair", background: "white",
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          style={{ position: "absolute", top: 0, left: 0, touchAction: "none" }}
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Volledige naam"
+        style={{ border: "0.5px solid #ccc", borderRadius: 8, padding: "6px 10px", fontSize: 13, fontFamily: "inherit", background: "white", width: "100%" }} />
+      <div ref={wrapRef} style={{ position: "relative", height: 110, border: hasSig ? "1.5px solid #1D9E75" : "1.5px dashed #ccc", borderRadius: 8, overflow: "hidden", cursor: "crosshair", background: "white" }}>
+        <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0, touchAction: "none" }}
           onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
-          onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
-        />
+          onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd} />
         {!hasSig && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#aaa", pointerEvents: "none", gap: 5 }}>
             <i className="ti ti-pencil" /> Teken hier
@@ -177,6 +161,8 @@ function SignaturePad({ label, sublabel }) {
 }
 
 const card = { border: "1px solid #e0e0e0", borderRadius: 10, padding: "0.875rem 1rem", background: "#fafafa" };
+const sec = { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" };
+const secTitle = { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 };
 
 export default function App() {
   const allItemIds = SECTIONS.flatMap((s) => s.items.map((i) => i.id));
@@ -201,25 +187,21 @@ export default function App() {
   const maxPossible = (allItemIds.length - naCount) * 5;
   const relevant = answered.filter((v) => v !== "na");
   const achieved = relevant.reduce((s, v) => s + SCORES[v], 0);
-  const pct = Math.round((achieved / maxPossible) * 100);
-  const counts = { ia: 0, sat: 0, good: 0, exc: 0, na: 0 };
+  const pct = Math.round((achieved / maxPossible) * 100) || 0;
+  const counts = { ia: 0, unsat: 0, sat: 0, good: 0, exc: 0, na: 0 };
   answered.forEach((v) => counts[v]++);
   const progress = Math.round((answered.length / allItemIds.length) * 100);
 
-  function setResponse(id, val) {
-    setResponses((prev) => ({ ...prev, [id]: val }));
-  }
+  function setResponse(id, val) { setResponses((prev) => ({ ...prev, [id]: val })); }
 
   function toggleEdit() {
     if (!editOpen) { setEditDraft({ ...location }); setAddrVerified(false); setAddrChanged(true); }
     setEditOpen((v) => !v);
   }
-
   function onVerifyChange(checked) {
     setAddrVerified(checked);
     if (checked) { setEditOpen(false); setAddrChanged(false); }
   }
-
   function applyEdit() { setLocation({ ...editDraft }); setAddrChanged(true); }
 
   function reset() {
@@ -233,36 +215,39 @@ export default function App() {
   const aFilled = stockA.filter((v) => v !== "").length;
   const bFilled = stockB.filter((r) => r.art.trim() && r.qty !== "").length;
 
-  const wrap = { fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" };
-  const sec = { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" };
-  const secTitle = { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 };
   const ansBtn = (val, selected) => ({
-    padding: "5px 11px", borderRadius: 20,
+    padding: "5px 10px", borderRadius: 20,
     border: selected ? `2px solid ${BTN_COLORS[val].border}` : "1.5px solid #bbb",
     background: selected ? BTN_COLORS[val].bg : "white",
     color: selected ? BTN_COLORS[val].color : "#555",
     cursor: "pointer", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
   });
-  const photoBtn = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", border: "0.5px dashed #ccc", borderRadius: 6, padding: "4px 8px", background: "none", cursor: "pointer", marginTop: 6 };
-  const submitBtn = { width: "100%", padding: 11, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+
   const pill = (k) => ({ fontSize: 12, fontWeight: 500, padding: "3px 10px", borderRadius: 20, border: `1px solid ${BTN_COLORS[k].border}`, background: BTN_COLORS[k].bg, color: BTN_COLORS[k].color });
   const stockTabStyle = (active) => ({ flex: 1, padding: 6, fontSize: 11, fontWeight: 500, cursor: "pointer", background: active ? "#1D9E75" : "white", color: active ? "white" : "#888", border: "none" });
   const stockInput = (wide) => ({ width: wide ? 110 : 72, border: "0.5px solid #ddd", borderRadius: 5, padding: "4px 6px", fontSize: 12, background: "white", textAlign: "center" });
-  const reportCard = { background: "#f9f9f9", border: "0.5px solid #eee", borderRadius: 10, padding: "0.875rem 1rem", textAlign: "left", marginBottom: "0.875rem" };
   const reportRow = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "5px 0", fontSize: 12, borderBottom: "0.5px solid #eee", gap: 10 };
+  const reportCard = { background: "#f9f9f9", border: "0.5px solid #eee", borderRadius: 10, padding: "0.875rem 1rem", textAlign: "left", marginBottom: "0.875rem" };
+
+  const LEGEND = [
+    ["#E24B4A","IA (0 pt)"],
+    ["#E07B3A","Unsat (1 pt)"],
+    ["#EF9F27","Sat (3 pt)"],
+    ["#639922","Good (4 pt)"],
+    ["#1D9E75","Excellent (5 pt)"],
+    ["#378ADD","N/A"],
+  ];
 
   if (view === "success") {
     const verifyLabel = addrVerified ? "✓ Bevestigd" : addrChanged ? "⚠ Adres aangepast" : "Niet geverifieerd";
     const verifyColor = addrVerified ? "#0F6E56" : addrChanged ? "#BA7517" : "#A32D2D";
     return (
-      <div style={wrap}>
-        <div style={{ padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-            <div style={{ fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
-              <i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360
-            </div>
-            <span style={{ fontSize: 11, background: "#E1F5EE", color: "#0F6E56", padding: "3px 10px", borderRadius: 20 }}>Demo</span>
+      <div style={{ fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" }}>
+        <div style={{ padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
+            <i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360
           </div>
+          <span style={{ fontSize: 11, background: "#E1F5EE", color: "#0F6E56", padding: "3px 10px", borderRadius: 20 }}>Demo</span>
         </div>
         <div style={{ padding: "2.5rem 1.25rem", textAlign: "center" }}>
           <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#E1F5EE", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
@@ -270,29 +255,34 @@ export default function App() {
           </div>
           <h2 style={{ fontSize: 19, fontWeight: 500, marginBottom: 7 }}>Audit ingediend</h2>
           <p style={{ fontSize: 13, color: "#888", marginBottom: "1.25rem" }}>Het rapport is verstuurd. De stock check wordt vergeleken met het systeem.</p>
+
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Locatie</div>
             <div style={reportRow}><span style={{ color: "#888" }}>Bedrijf</span><span style={{ fontWeight: 500 }}>{location.name}</span></div>
             <div style={reportRow}><span style={{ color: "#888" }}>Adres</span><span style={{ fontWeight: 500, textAlign: "right" }}>{location.street}, {location.city}</span></div>
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Verificatie</span><span style={{ fontWeight: 500, color: verifyColor }}>{verifyLabel}</span></div>
           </div>
+
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Checklist score</div>
-            {["ia","sat","good","exc"].map((k) => (
+            {["ia","unsat","sat","good","exc"].map((k) => (
               <div key={k} style={reportRow}><span style={{ color: "#888" }}>{LABELS[k]}</span><span style={{ fontWeight: 500, color: BTN_COLORS[k].color }}>{counts[k]}</span></div>
             ))}
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Totaalscore</span><span style={{ fontWeight: 500, color: pctColor(pct) }}>{pct}% ({achieved}/{maxPossible} pt)</span></div>
           </div>
+
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Ruimte voor groei</div>
             <div style={reportRow}><span style={{ color: "#888" }}>Beschikbare capaciteit</span><span style={{ fontWeight: 500, color: sliderColor }}>{sliderVal}% vrij</span></div>
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Toelichting</span><span style={{ fontWeight: 500 }}>{sliderRemark || "—"}</span></div>
           </div>
+
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Stock check</div>
             <div style={reportRow}><span style={{ color: "#888" }}>Artikel → Bin</span><span style={{ fontWeight: 500 }}>{aFilled}/5 artikelen geteld</span></div>
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Bin → Papier</span><span style={{ fontWeight: 500 }}>{bFilled}/5 locaties genoteerd</span></div>
           </div>
+
           <button onClick={reset} style={{ border: "0.5px solid #ddd", background: "white", borderRadius: 8, padding: "9px 18px", fontSize: 13, cursor: "pointer" }}>
             <i className="ti ti-refresh" /> Opnieuw starten
           </button>
@@ -302,7 +292,8 @@ export default function App() {
   }
 
   return (
-    <div style={wrap}>
+    <div style={{ fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" }}>
+
       {/* HEADER */}
       <div style={{ padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
@@ -310,7 +301,7 @@ export default function App() {
             <i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button style={{ fontSize: 12, color: "#888", border: "0.5px solid #ddd", borderRadius: 8, padding: "4px 10px", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }} onClick={reset}>
+            <button onClick={reset} style={{ fontSize: 12, color: "#888", border: "0.5px solid #ddd", borderRadius: 8, padding: "4px 10px", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               <i className="ti ti-refresh" style={{ fontSize: 13 }} /> Reset
             </button>
             <span style={{ fontSize: 11, background: "#E1F5EE", color: "#0F6E56", padding: "3px 10px", borderRadius: 20 }}>Demo</span>
@@ -322,10 +313,10 @@ export default function App() {
       {/* LIVE SCORE */}
       <div style={{ padding: "10px 1.25rem", background: "#f9f9f9", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          
-          {["ia","sat","good","exc"].map((k) => counts[k] > 0 && (
+          {["ia","unsat","sat","good","exc"].map((k) => counts[k] > 0 && (
             <span key={k} style={pill(k)}>{LABELS[k]} {counts[k]}</span>
           ))}
+          {answered.length === 0 && <span style={{ fontSize: 12, color: "#aaa" }}>Score: 0% bij start</span>}
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 20, fontWeight: 600, color: pctColor(pct) }}>{pct}%</div>
@@ -338,7 +329,7 @@ export default function App() {
 
       {/* LEGEND */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "8px 1.25rem", borderBottom: "0.5px solid #eee", background: "#f9f9f9" }}>
-        {[["#E24B4A","IA (0 pt)"],["#EF9F27","Satisfactory (1 pt)"],["#639922","Good (3 pt)"],["#1D9E75","Excellent (5 pt)"],["#378ADD","N/A"]].map(([c,l]) => (
+        {LEGEND.map(([c, l]) => (
           <div key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" }}>
             <div style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />{l}
           </div>
@@ -365,7 +356,7 @@ export default function App() {
               <div style={{ fontSize: 11, color: "#BA7517", display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
                 <i className="ti ti-alert-triangle" /> Wijzigingen worden meegestuurd in het rapport
               </div>
-              {[["Bedrijfsnaam","name"],["Straat & huisnummer","street"],["Postcode & stad","city"],["Locatiedetail","detail"]].map(([lbl,key]) => (
+              {[["Bedrijfsnaam","name"],["Straat & huisnummer","street"],["Postcode & stad","city"],["Locatiedetail","detail"]].map(([lbl, key]) => (
                 <div key={key}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 3, marginTop: 7 }}>{lbl}</div>
                   <input value={editDraft[key]} onChange={(e) => setEditDraft((d) => ({ ...d, [key]: e.target.value }))} onBlur={applyEdit}
@@ -381,7 +372,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* CHECKLIST SECTIES */}
+      {/* CHECKLIST */}
       {SECTIONS.map((section) => (
         <div key={section.id} style={sec}>
           <div style={secTitle}><i className={`ti ${section.icon}`} /> {section.title}</div>
@@ -391,13 +382,13 @@ export default function App() {
                 <div style={{ fontSize: 13, marginBottom: 2 }}>{item.label}</div>
                 <div style={{ fontSize: 11, color: "#aaa" }}>{item.sub}</div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 7 }}>
-                  {["ia","sat","good","exc","na"].map((k) => (
+                  {ANSWER_KEYS.map((k) => (
                     <button key={k} style={ansBtn(k, responses[item.id] === k)} onClick={() => setResponse(item.id, k)}>{LABELS[k]}</button>
                   ))}
                 </div>
                 {photos[item.id]
                   ? <div style={{ fontSize: 11, color: "#0F6E56", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}><i className="ti ti-photo-check" /> 1 foto toegevoegd</div>
-                  : <button style={photoBtn} onClick={() => setPhotos((p) => ({ ...p, [item.id]: true }))}><i className="ti ti-camera" /> Foto toevoegen</button>
+                  : <button style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", border: "0.5px dashed #ccc", borderRadius: 6, padding: "4px 8px", background: "none", cursor: "pointer", marginTop: 6 }} onClick={() => setPhotos((p) => ({ ...p, [item.id]: true }))}><i className="ti ti-camera" /> Foto toevoegen</button>
                 }
               </div>
             ))}
@@ -501,10 +492,11 @@ export default function App() {
 
       {/* SUBMIT */}
       <div style={{ padding: "1rem 1.25rem" }}>
-        <button style={submitBtn} onClick={() => setView("success")}>
+        <button style={{ width: "100%", padding: 11, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => setView("success")}>
           <i className="ti ti-send" /> Audit indienen
         </button>
       </div>
+
     </div>
   );
 }
