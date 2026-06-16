@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import AuthPage from "./Auth.jsx";
+import Dashboard from "./Dashboard.jsx";
 
 const SCORES = { ia: 0, unsat: 1, sat: 3, good: 4, exc: 5 };
 const LABELS = { ia: "IA", unsat: "Unsat", sat: "Sat", good: "Good", exc: "Excellent", na: "N/A" };
@@ -171,14 +172,16 @@ function SignaturePad({ label, sublabel }) {
         </span>
       </div>
       <div style={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: 4 }}>
-        <i className="ti ti-calendar" /> 6 juni 2026 · Rotterdam
+        <i className="ti ti-calendar" /> {new Date().toLocaleDateString("nl-NL")}
       </div>
     </div>
   );
 }
 
+// ── Root App ──────────────────────────────────────────────
 export default function App() {
   const [session, setSession] = useState(null);
+  const [showAudit, setShowAudit] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -187,14 +190,15 @@ export default function App() {
   }, []);
 
   if (!session) return <AuthPage />;
+  if (!showAudit) return <Dashboard session={session} onStartAudit={() => setShowAudit(true)} />;
 
   const allItemIds = SECTIONS.flatMap((s) => s.items.map((i) => i.id));
   const initState = () => Object.fromEntries(allItemIds.map((id) => [id, null]));
-
-  return <AuditApp allItemIds={allItemIds} initState={initState} session={session} />;
+  return <AuditApp allItemIds={allItemIds} initState={initState} session={session} onBack={() => setShowAudit(false)} />;
 }
 
-function AuditApp({ allItemIds, initState, session }) {
+// ── Audit App ─────────────────────────────────────────────
+function AuditApp({ allItemIds, initState, session, onBack }) {
   const [view, setView] = useState("audit");
   const [responses, setResponses] = useState(initState);
   const [photos, setPhotos] = useState({});
@@ -231,10 +235,6 @@ function AuditApp({ allItemIds, initState, session }) {
   }
   function applyEdit() { setLocation({ ...editDraft }); setAddrChanged(true); }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-  }
-
   function reset() {
     setResponses(initState()); setPhotos({}); setSliderVal(50); setSliderRemark("");
     setStockA(ARTIKELEN.map(() => "")); setStockB(LOCATIES.map(() => ({ art: "", qty: "" })));
@@ -265,20 +265,17 @@ function AuditApp({ allItemIds, initState, session }) {
     return (
       <div style={{ fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" }}>
         <div style={{ padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, color: "#888" }}>{session.user.email}</span>
-            <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }}>Uitloggen</button>
-          </div>
+          <button onClick={onBack} style={{ fontSize: 13, color: "#1D9E75", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+            <i className="ti ti-arrow-left" /> Dashboard
+          </button>
+          <span style={{ fontSize: 11, background: "#E1F5EE", color: "#0F6E56", padding: "3px 10px", borderRadius: 20 }}>Ingediend</span>
         </div>
         <div style={{ padding: "2.5rem 1.25rem", textAlign: "center" }}>
           <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#E1F5EE", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem" }}>
             <i className="ti ti-check" style={{ fontSize: 30, color: "#0F6E56" }} />
           </div>
           <h2 style={{ fontSize: 19, fontWeight: 500, marginBottom: 7 }}>Audit ingediend</h2>
-          <p style={{ fontSize: 13, color: "#888", marginBottom: "1.25rem" }}>Het rapport is verstuurd. De stock check wordt vergeleken met het systeem.</p>
+          <p style={{ fontSize: 13, color: "#888", marginBottom: "1.25rem" }}>Het rapport is verstuurd.</p>
           <div style={reportCard}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 7 }}>Locatie</div>
             <div style={reportRow}><span style={{ color: "#888" }}>Bedrijf</span><span style={{ fontWeight: 500 }}>{location.name}</span></div>
@@ -302,9 +299,14 @@ function AuditApp({ allItemIds, initState, session }) {
             <div style={reportRow}><span style={{ color: "#888" }}>Artikel → Bin</span><span style={{ fontWeight: 500 }}>{aFilled}/5 artikelen geteld</span></div>
             <div style={{ ...reportRow, borderBottom: "none" }}><span style={{ color: "#888" }}>Bin → Papier</span><span style={{ fontWeight: 500 }}>{bFilled}/5 locaties genoteerd</span></div>
           </div>
-          <button onClick={reset} style={{ border: "0.5px solid #ddd", background: "white", borderRadius: 8, padding: "9px 18px", fontSize: 13, cursor: "pointer" }}>
-            <i className="ti ti-refresh" /> Opnieuw starten
-          </button>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            <button onClick={reset} style={{ border: "0.5px solid #ddd", background: "white", borderRadius: 8, padding: "9px 18px", fontSize: 13, cursor: "pointer" }}>
+              <i className="ti ti-refresh" /> Nieuwe audit
+            </button>
+            <button onClick={onBack} style={{ border: "none", background: "#1D9E75", color: "white", borderRadius: 8, padding: "9px 18px", fontSize: 13, cursor: "pointer" }}>
+              <i className="ti ti-home" /> Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -314,17 +316,16 @@ function AuditApp({ allItemIds, initState, session }) {
     <div style={{ fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" }}>
       <div style={{ padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <div style={{ fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360
-          </div>
+          <button onClick={onBack} style={{ fontSize: 13, color: "#1D9E75", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+            <i className="ti ti-arrow-left" /> Dashboard
+          </button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button onClick={reset} style={{ fontSize: 12, color: "#888", border: "0.5px solid #ddd", borderRadius: 8, padding: "4px 10px", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
               <i className="ti ti-refresh" style={{ fontSize: 13 }} /> Reset
             </button>
-            <button onClick={handleLogout} style={{ fontSize: 12, color: "#888", border: "0.5px solid #ddd", borderRadius: 8, padding: "4px 10px", background: "none", cursor: "pointer" }}>Uitloggen</button>
           </div>
         </div>
-        <div style={{ fontSize: 12, color: "#888" }}>Ingelogd als {session.user.email}</div>
+        <div style={{ fontSize: 12, color: "#888" }}>Warehouse compliance audit · {session.user.email}</div>
       </div>
 
       <div style={{ padding: "10px 1.25rem", background: "#f9f9f9", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
