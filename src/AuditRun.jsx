@@ -169,7 +169,15 @@ export default function AuditRun({ session, locationId, templateId, location, te
     load();
   }, [locationId, templateId]);
 
-  const allItems = sections.flatMap((s) => s.items);
+  const rawItems = sections.flatMap((s) => s.items);
+
+  // A question is visible if it has no condition, or its condition is currently met
+  function isVisible(item) {
+    if (!item.depends_on_item_id) return true;
+    return responses[item.depends_on_item_id] === item.depends_on_value;
+  }
+
+  const allItems = rawItems.filter(isVisible);
   // exclude signature type from progress count
   const countableItems = allItems.filter((i) => i.answer_type !== "signature");
   const answered = countableItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "");
@@ -293,12 +301,15 @@ export default function AuditRun({ session, locationId, templateId, location, te
       </div>
 
       {/* DYNAMIC SECTIONS */}
-      {sections.map((section) => (
+      {sections.map((section) => {
+        const visibleItems = section.items.filter(isVisible);
+        if (visibleItems.length === 0) return null;
+        return (
         <div key={section.id} style={sec}>
           <div style={secTitle}><i className="ti ti-list" /> {section.name}</div>
           <div style={card}>
-            {section.items.map((item, idx) => (
-              <div key={item.id} style={{ padding:"10px 0",borderBottom:idx===section.items.length-1?"none":"0.5px solid #e8e8e8",paddingBottom:idx===section.items.length-1?0:10 }}>
+            {visibleItems.map((item, idx) => (
+              <div key={item.id} style={{ padding:"10px 0",borderBottom:idx===visibleItems.length-1?"none":"0.5px solid #e8e8e8",paddingBottom:idx===visibleItems.length-1?0:10 }}>
                 {item.answer_type !== "signature" && (
                   <>
                     <div style={{ fontSize:13,marginBottom:2 }}>{item.label}</div>
@@ -320,7 +331,8 @@ export default function AuditRun({ session, locationId, templateId, location, te
             ))}
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {/* SUBMIT */}
       <div style={{ padding:"1rem 1.25rem" }}>

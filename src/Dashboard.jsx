@@ -400,6 +400,7 @@ function TemplateDetail({ template, onBack }) {
   const [sections, setSections] = useState([]);
   const [items, setItems] = useState({});
   const [answerSets, setAnswerSets] = useState([]);
+  const [optionsBySet, setOptionsBySet] = useState({}); // setId -> [options]
   const [loading, setLoading] = useState(true);
   const [newSectionName, setNewSectionName] = useState("");
   const [addingSection, setAddingSection] = useState(false);
@@ -421,9 +422,22 @@ function TemplateDetail({ template, onBack }) {
       (itemData || []).forEach((it) => { grouped[it.section_id] = grouped[it.section_id] || []; grouped[it.section_id].push(it); });
       setItems(grouped);
     } else { setItems({}); }
+    if (setsData && setsData.length > 0) {
+      const { data: optData } = await supabase.from("answer_options").select("*").in("set_id", setsData.map((s) => s.id)).order("sort_order");
+      const grouped = {};
+      (optData || []).forEach((o) => { grouped[o.set_id] = grouped[o.set_id] || []; grouped[o.set_id].push(o); });
+      setOptionsBySet(grouped);
+    }
     setLoading(false);
   }
   useEffect(() => { load(); }, [template.id]);
+
+  // Get the options available for a given item (for "depends on this answer" pickers)
+  function optionsForItem(itemId, sectionId) {
+    const item = (items[sectionId] || []).find((i) => i.id === itemId);
+    if (!item || !item.answer_set_id) return [];
+    return optionsBySet[item.answer_set_id] || [];
+  }
 
   async function addSection() {
     if (!newSectionName.trim()) return;
@@ -436,10 +450,15 @@ function TemplateDetail({ template, onBack }) {
   }
 
   function toggleItemForm(sectionId) {
-    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
+    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
   }
   function updateItemForm(sectionId, field, value) {
-    setNewItemForms((f) => ({ ...f, [sectionId]: { ...(f[sectionId] || { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1" }), [field]: value, open: true } }));
+    setNewItemForms((f) => {
+      const current = f[sectionId] || { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "" };
+      const updated = { ...current, [field]: value, open: true };
+      if (field === "depends_on_item_id") updated.depends_on_value = ""; // reset trigger value when target question changes
+      return { ...f, [sectionId]: updated };
+    });
   }
 
   async function addItem(sectionId) {
@@ -452,9 +471,11 @@ function TemplateDetail({ template, onBack }) {
       answer_type: form.answer_type || "score",
       answer_set_id: form.answer_type === "score" && form.answer_set_id ? form.answer_set_id : null,
       weight: form.weight ? parseFloat(form.weight) : 1,
+      depends_on_item_id: form.depends_on_item_id || null,
+      depends_on_value: form.depends_on_item_id && form.depends_on_value ? form.depends_on_value : null,
       sort_order: (items[sectionId] || []).length,
     }]);
-    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", open: false } }));
+    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", open: false } }));
     await load();
   }
   async function removeItem(id) {
@@ -464,7 +485,12 @@ function TemplateDetail({ template, onBack }) {
 
   function startEdit(item) {
     setEditingItemId(item.id);
-    setEditForm({ label: item.label, sub_label: item.sub_label || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "", weight: item.weight !== null && item.weight !== undefined ? String(item.weight) : "1" });
+    setEditForm({
+      label: item.label, sub_label: item.sub_label || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "",
+      weight: item.weight !== null && item.weight !== undefined ? String(item.weight) : "1",
+      depends_on_item_id: item.depends_on_item_id || "", depends_on_value: item.depends_on_value || "",
+      _sectionId: item.section_id,
+    });
   }
   function cancelEdit() { setEditingItemId(null); setEditForm({}); }
   async function saveEdit() {
@@ -475,6 +501,8 @@ function TemplateDetail({ template, onBack }) {
       answer_type: editForm.answer_type || "score",
       answer_set_id: editForm.answer_type === "score" && editForm.answer_set_id ? editForm.answer_set_id : null,
       weight: editForm.weight ? parseFloat(editForm.weight) : 1,
+      depends_on_item_id: editForm.depends_on_item_id || null,
+      depends_on_value: editForm.depends_on_item_id && editForm.depends_on_value ? editForm.depends_on_value : null,
     }).eq("id", editingItemId);
     setEditingItemId(null); setEditForm({});
     await load();
@@ -525,6 +553,21 @@ function TemplateDetail({ template, onBack }) {
                       )}
                       <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
                       <input type="number" step="0.5" min="0.5" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} style={s.input} placeholder="1 = normaal, 2 = dubbel belang" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Alleen tonen als... (optioneel)</div>
+                      <select value={editForm.depends_on_item_id} onChange={(e) => setEditForm((f) => ({ ...f, depends_on_item_id: e.target.value, depends_on_value: "" }))} style={s.select}>
+                        <option value="">— Altijd tonen —</option>
+                        {(items[section.id] || []).filter((it) => it.id !== item.id).map((it) => <option key={it.id} value={it.id}>{it.label}</option>)}
+                      </select>
+                      {editForm.depends_on_item_id && (
+                        <>
+                          <div style={{ ...s.label, marginTop: 8 }}>...dit antwoord gegeven is</div>
+                          <select value={editForm.depends_on_value} onChange={(e) => setEditForm((f) => ({ ...f, depends_on_value: e.target.value }))} style={s.select}>
+                            <option value="">— Kies een antwoord —</option>
+                            {optionsForItem(editForm.depends_on_item_id, section.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                          </select>
+                          {optionsForItem(editForm.depends_on_item_id, section.id).length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ Deze vraag heeft geen antwoordset met opties.</div>}
+                        </>
+                      )}
                       <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                         <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Opslaan</button>
                         <button style={s.btn(false)} onClick={cancelEdit}>Annuleren</button>
@@ -542,6 +585,11 @@ function TemplateDetail({ template, onBack }) {
                           {item.weight && item.weight !== 1 && (
                             <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806", fontWeight: 500 }}>
                               Weging ×{item.weight}
+                            </span>
+                          )}
+                          {item.depends_on_item_id && (
+                            <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C", fontWeight: 500 }}>
+                              <i className="ti ti-git-branch" style={{ fontSize: 10 }} /> Voorwaardelijk
                             </span>
                           )}
                         </div>
@@ -578,6 +626,21 @@ function TemplateDetail({ template, onBack }) {
                   )}
                   <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
                   <input type="number" step="0.5" min="0.5" value={newItemForms[section.id]?.weight || "1"} onChange={(e) => updateItemForm(section.id, "weight", e.target.value)} style={s.input} placeholder="1 = normaal, 2 = dubbel belang" />
+                  <div style={{ ...s.label, marginTop: 8 }}>Alleen tonen als... (optioneel)</div>
+                  <select value={newItemForms[section.id]?.depends_on_item_id || ""} onChange={(e) => updateItemForm(section.id, "depends_on_item_id", e.target.value)} style={s.select}>
+                    <option value="">— Altijd tonen —</option>
+                    {(items[section.id] || []).map((it) => <option key={it.id} value={it.id}>{it.label}</option>)}
+                  </select>
+                  {newItemForms[section.id]?.depends_on_item_id && (
+                    <>
+                      <div style={{ ...s.label, marginTop: 8 }}>...dit antwoord gegeven is</div>
+                      <select value={newItemForms[section.id]?.depends_on_value || ""} onChange={(e) => updateItemForm(section.id, "depends_on_value", e.target.value)} style={s.select}>
+                        <option value="">— Kies een antwoord —</option>
+                        {optionsForItem(newItemForms[section.id]?.depends_on_item_id, section.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                      </select>
+                      {optionsForItem(newItemForms[section.id]?.depends_on_item_id, section.id).length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ Deze vraag heeft geen antwoordset met opties.</div>}
+                    </>
+                  )}
                   <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                     <button style={s.btn(true)} onClick={() => addItem(section.id)}><i className="ti ti-check" /> Toevoegen</button>
                     <button style={s.btn(false)} onClick={() => toggleItemForm(section.id)}>Annuleren</button>
