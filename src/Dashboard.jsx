@@ -334,6 +334,8 @@ function TemplateDetail({ template, onBack }) {
   const [newSectionName, setNewSectionName] = useState("");
   const [addingSection, setAddingSection] = useState(false);
   const [newItemForms, setNewItemForms] = useState({});
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   async function load() {
     setLoading(true);
@@ -389,6 +391,23 @@ function TemplateDetail({ template, onBack }) {
     await supabase.from("template_items").delete().eq("id", id); await load();
   }
 
+  function startEdit(item) {
+    setEditingItemId(item.id);
+    setEditForm({ label: item.label, sub_label: item.sub_label || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "" });
+  }
+  function cancelEdit() { setEditingItemId(null); setEditForm({}); }
+  async function saveEdit() {
+    if (!editForm.label?.trim()) return;
+    await supabase.from("template_items").update({
+      label: editForm.label,
+      sub_label: editForm.sub_label || null,
+      answer_type: editForm.answer_type || "score",
+      answer_set_id: editForm.answer_type === "score" && editForm.answer_set_id ? editForm.answer_set_id : null,
+    }).eq("id", editingItemId);
+    setEditingItemId(null); setEditForm({});
+    await load();
+  }
+
   function answerTypeLabel(type, setName) {
     const found = ANSWER_TYPES.find((t) => t.value === type);
     if (type === "score" && setName) return setName;
@@ -413,16 +432,45 @@ function TemplateDetail({ template, onBack }) {
               </div>
               <div style={{ marginTop: 10 }}>
                 {(items[section.id] || []).map((item, idx) => (
-                  <div key={item.id} style={{ padding: "8px 0", borderTop: idx === 0 ? "none" : "0.5px solid #e8e8e8", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13 }}>{item.label}</div>
-                      {item.sub_label && <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>{item.sub_label}</div>}
-                      <span style={{ fontSize: 11, marginTop: 4, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#f0f0f0", color: "#888" }}>
-                        {answerTypeLabel(item.answer_type, item.answer_sets?.name)}
-                      </span>
+                  editingItemId === item.id ? (
+                    <div key={item.id} style={{ marginTop: idx === 0 ? 0 : 8, background: "white", border: "1px solid #1D9E75", borderRadius: 8, padding: 10 }}>
+                      <div style={s.label}>Vraag *</div>
+                      <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
+                      <div style={{ ...s.label, marginTop: 8 }}>Toelichting (optioneel)</div>
+                      <input value={editForm.sub_label} onChange={(e) => setEditForm((f) => ({ ...f, sub_label: e.target.value }))} style={s.input} />
+                      <div style={{ ...s.label, marginTop: 8 }}>Antwoordtype</div>
+                      <select value={editForm.answer_type} onChange={(e) => setEditForm((f) => ({ ...f, answer_type: e.target.value }))} style={s.select}>
+                        {ANSWER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                      {editForm.answer_type === "score" && (
+                        <>
+                          <div style={{ ...s.label, marginTop: 8 }}>Antwoordset</div>
+                          <select value={editForm.answer_set_id} onChange={(e) => setEditForm((f) => ({ ...f, answer_set_id: e.target.value }))} style={s.select}>
+                            <option value="">— Kies een antwoordset —</option>
+                            {answerSets.map((as) => <option key={as.id} value={as.id}>{as.name}</option>)}
+                          </select>
+                        </>
+                      )}
+                      <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                        <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Opslaan</button>
+                        <button style={s.btn(false)} onClick={cancelEdit}>Annuleren</button>
+                      </div>
                     </div>
-                    <button onClick={() => removeItem(item.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}><i className="ti ti-x" /></button>
-                  </div>
+                  ) : (
+                    <div key={item.id} style={{ padding: "8px 0", borderTop: idx === 0 ? "none" : "0.5px solid #e8e8e8", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13 }}>{item.label}</div>
+                        {item.sub_label && <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>{item.sub_label}</div>}
+                        <span style={{ fontSize: 11, marginTop: 4, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#f0f0f0", color: "#888" }}>
+                          {answerTypeLabel(item.answer_type, item.answer_sets?.name)}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => startEdit(item)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
+                        <button onClick={() => removeItem(item.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
+                      </div>
+                    </div>
+                  )
                 ))}
                 {(items[section.id] || []).length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0" }}>Nog geen vragen.</div>}
               </div>
@@ -467,6 +515,7 @@ function TemplateDetail({ template, onBack }) {
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <button style={s.btn(true)} onClick={addSection}><i className="ti ti-check" /> Toevoegen</button>
                 <button style={s.btn(false)} onClick={() => { setAddingSection(false); setNewSectionName(""); }}>Annuleren</button>
+              </div>
               </div>
             </div>
           ) : (
