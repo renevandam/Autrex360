@@ -438,10 +438,10 @@ function TemplateDetail({ template, onBack }) {
   }
 
   function toggleItemForm(sectionId) {
-    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
+    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
   }
   function updateItemForm(sectionId, field, value) {
-    setNewItemForms((f) => ({ ...f, [sectionId]: { ...(f[sectionId] || { label: "", sub_label: "", answer_type: "score", answer_set_id: "" }), [field]: value, open: true } }));
+    setNewItemForms((f) => ({ ...f, [sectionId]: { ...(f[sectionId] || { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1" }), [field]: value, open: true } }));
   }
 
   async function addItem(sectionId) {
@@ -453,9 +453,10 @@ function TemplateDetail({ template, onBack }) {
       sub_label: form.sub_label || null,
       answer_type: form.answer_type || "score",
       answer_set_id: form.answer_type === "score" && form.answer_set_id ? form.answer_set_id : null,
+      weight: form.weight ? parseFloat(form.weight) : 1,
       sort_order: (items[sectionId] || []).length,
     }]);
-    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", open: false } }));
+    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", open: false } }));
     await load();
   }
   async function removeItem(id) {
@@ -465,7 +466,7 @@ function TemplateDetail({ template, onBack }) {
 
   function startEdit(item) {
     setEditingItemId(item.id);
-    setEditForm({ label: item.label, sub_label: item.sub_label || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "" });
+    setEditForm({ label: item.label, sub_label: item.sub_label || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "", weight: item.weight !== null && item.weight !== undefined ? String(item.weight) : "1" });
   }
   function cancelEdit() { setEditingItemId(null); setEditForm({}); }
   async function saveEdit() {
@@ -475,6 +476,7 @@ function TemplateDetail({ template, onBack }) {
       sub_label: editForm.sub_label || null,
       answer_type: editForm.answer_type || "score",
       answer_set_id: editForm.answer_type === "score" && editForm.answer_set_id ? editForm.answer_set_id : null,
+      weight: editForm.weight ? parseFloat(editForm.weight) : 1,
     }).eq("id", editingItemId);
     setEditingItemId(null); setEditForm({});
     await load();
@@ -523,6 +525,8 @@ function TemplateDetail({ template, onBack }) {
                           </select>
                         </>
                       )}
+                      <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
+                      <input type="number" step="0.5" min="0.5" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} style={s.input} placeholder="1 = normaal, 2 = dubbel belang" />
                       <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                         <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Opslaan</button>
                         <button style={s.btn(false)} onClick={cancelEdit}>Annuleren</button>
@@ -533,9 +537,16 @@ function TemplateDetail({ template, onBack }) {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13 }}>{item.label}</div>
                         {item.sub_label && <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>{item.sub_label}</div>}
-                        <span style={{ fontSize: 11, marginTop: 4, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#f0f0f0", color: "#888" }}>
-                          {answerTypeLabel(item.answer_type, item.answer_sets?.name)}
-                        </span>
+                        <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#f0f0f0", color: "#888" }}>
+                            {answerTypeLabel(item.answer_type, item.answer_sets?.name)}
+                          </span>
+                          {item.weight && item.weight !== 1 && (
+                            <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806", fontWeight: 500 }}>
+                              Weging ×{item.weight}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                         <button onClick={() => startEdit(item)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
@@ -567,6 +578,8 @@ function TemplateDetail({ template, onBack }) {
                       {answerSets.length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ Nog geen antwoordsets. Maak er eerst een aan bij "Antwoordsets".</div>}
                     </>
                   )}
+                  <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
+                  <input type="number" step="0.5" min="0.5" value={newItemForms[section.id]?.weight || "1"} onChange={(e) => updateItemForm(section.id, "weight", e.target.value)} style={s.input} placeholder="1 = normaal, 2 = dubbel belang" />
                   <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                     <button style={s.btn(true)} onClick={() => addItem(section.id)}><i className="ti ti-check" /> Toevoegen</button>
                     <button style={s.btn(false)} onClick={() => toggleItemForm(section.id)}>Annuleren</button>

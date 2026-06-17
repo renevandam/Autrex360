@@ -196,11 +196,12 @@ export default function AuditRun({ session, locationId, templateId, location, te
   const progress = countableItems.length > 0 ? Math.round((answered.length / countableItems.length) * 100) : 0;
 
   // Score
+  const itemWeight = (i) => i.weight ? Number(i.weight) : 1;
   const scoreItems = allItems.filter((i) => (i.answer_type === "score" || !i.answer_type) && (itemOptions[i.id]||[]).length > 0);
   const naAnswers = scoreItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_na; });
   const itemMaxScore = (i) => Math.max(0, ...((itemOptions[i.id]||[]).filter((o) => !o.is_na && o.score !== null).map((o) => o.score)));
-  const relevantMax = scoreItems.filter((i) => !naAnswers.includes(i)).reduce((sum, i) => sum + itemMaxScore(i), 0);
-  const achieved = scoreItems.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && !opt.is_na; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0); }, 0);
+  const relevantMax = scoreItems.filter((i) => !naAnswers.includes(i)).reduce((sum, i) => sum + itemMaxScore(i) * itemWeight(i), 0);
+  const achieved = scoreItems.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && !opt.is_na; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0)*itemWeight(i); }, 0);
   const pct = relevantMax > 0 ? Math.round((achieved / relevantMax) * 100) : 0;
   const actionItems = allItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_action_item; });
 
@@ -238,7 +239,7 @@ export default function AuditRun({ session, locationId, templateId, location, te
             ["Locatie", locData.name],
             ["Template", template?.name],
             ["Beantwoord", `${answered.length}/${countableItems.length} vragen`],
-            ...(relevantMax > 0 ? [["Score", `${pct}% (${achieved}/${relevantMax} pt)`]] : []),
+            ...(relevantMax > 0 ? [["Score", `${pct}% (${Math.round(achieved*10)/10}/${Math.round(relevantMax*10)/10} pt)`]] : []),
           ].map(([lbl, val], i, arr) => (
             <div key={lbl} style={{ fontSize:13,display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<arr.length-1?"0.5px solid #eee":"none" }}>
               <span style={{ color:"#888" }}>{lbl}</span>
@@ -271,7 +272,7 @@ export default function AuditRun({ session, locationId, templateId, location, te
         <div style={{ textAlign:"right" }}>
           {relevantMax > 0 ? <>
             <div style={{ fontSize:20,fontWeight:600,color:pctColor(pct) }}>{pct}%</div>
-            <div style={{ fontSize:11,color:"#aaa" }}>{achieved} / {relevantMax} pt</div>
+            <div style={{ fontSize:11,color:"#aaa" }}>{Math.round(achieved*10)/10} / {Math.round(relevantMax*10)/10} pt</div>
           </> : <div style={{ fontSize:12,color:"#aaa" }}>—</div>}
         </div>
       </div>
