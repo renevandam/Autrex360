@@ -151,6 +151,8 @@ function AnswerSetDetail({ set, onBack }) {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ label: "", value: "", score: "", color: OPTION_COLORS[0] });
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   async function load() {
     setLoading(true);
@@ -173,6 +175,22 @@ function AnswerSetDetail({ set, onBack }) {
     await load();
   }
 
+  function startEdit(opt) {
+    setEditingId(opt.id);
+    setEditForm({ label: opt.label, score: opt.score !== null ? String(opt.score) : "", color: opt.color || OPTION_COLORS[0] });
+  }
+  function cancelEdit() { setEditingId(null); setEditForm({}); }
+  async function saveEdit() {
+    if (!editForm.label?.trim()) return;
+    await supabase.from("answer_options").update({
+      label: editForm.label,
+      score: editForm.score !== "" ? parseInt(editForm.score) : null,
+      color: editForm.color,
+    }).eq("id", editingId);
+    setEditingId(null); setEditForm({});
+    await load();
+  }
+
   return (
     <div style={s.page}>
       <button style={s.backBtn} onClick={onBack}><i className="ti ti-arrow-left" /> Alle antwoordsets</button>
@@ -185,14 +203,42 @@ function AnswerSetDetail({ set, onBack }) {
         <div style={s.card}>
           {options.length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0 10px" }}>Nog geen opties. Voeg de eerste toe!</div>}
           {options.map((opt, idx) => (
-            <div key={opt.id} style={{ padding: "8px 0", borderBottom: idx < options.length - 1 ? "0.5px solid #eee" : "none", display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 12, height: 12, borderRadius: "50%", background: opt.color || "#ccc", flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</span>
-                {opt.score !== null && <span style={{ fontSize: 11, color: "#aaa", marginLeft: 8 }}>{opt.score} pt</span>}
+            editingId === opt.id ? (
+              <div key={opt.id} style={{ marginTop: idx === 0 ? 0 : 8, marginBottom: 8, background: "white", border: "1px solid #1D9E75", borderRadius: 8, padding: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={s.label}>Label *</div>
+                    <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
+                  </div>
+                  <div>
+                    <div style={s.label}>Score (optioneel)</div>
+                    <input type="number" value={editForm.score} onChange={(e) => setEditForm((f) => ({ ...f, score: e.target.value }))} style={s.input} placeholder="bijv. 3" />
+                  </div>
+                  <div>
+                    <div style={s.label}>Kleur</div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                      {OPTION_COLORS.map((c) => (
+                        <div key={c} onClick={() => setEditForm((f) => ({ ...f, color: c }))} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: editForm.color === c ? "2.5px solid #333" : "2px solid transparent" }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                  <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Opslaan</button>
+                  <button style={s.btn(false)} onClick={cancelEdit}>Annuleren</button>
+                </div>
               </div>
-              <button onClick={() => removeOption(opt.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
-            </div>
+            ) : (
+              <div key={opt.id} style={{ padding: "8px 0", borderBottom: idx < options.length - 1 ? "0.5px solid #eee" : "none", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: opt.color || "#ccc", flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</span>
+                  {opt.score !== null && <span style={{ fontSize: 11, color: "#aaa", marginLeft: 8 }}>{opt.score} pt</span>}
+                </div>
+                <button onClick={() => startEdit(opt)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
+                <button onClick={() => removeOption(opt.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
+              </div>
+            )
           ))}
 
           {adding ? (
