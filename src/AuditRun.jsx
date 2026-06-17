@@ -70,12 +70,16 @@ function StockTakeTable({ item, auditId }) {
   const col2 = item.stock_col2_label || "Binlocatie";
   const col3 = item.stock_col3_label || "Aantal";
   const saveTimers = useRef({});
+  const insertInFlight = useRef({}); // rowIdx -> Promise resolving to the row's db id, so concurrent saves don't double-insert
 
   useEffect(() => {
     async function load() {
       if (!auditId) { setLoading(false); return; }
       const { data } = await supabase.from("stock_checks").select("*").eq("audit_id", auditId).eq("item_id", item.id).order("row_order");
-      let loaded = data || [];
+      // De-duplicate by row_order in case old duplicate rows exist; keep the most recently created one
+      const byOrder = {};
+      (data || []).forEach((r) => { byOrder[r.row_order] = r; });
+      let loaded = Object.values(byOrder).sort((a, b) => a.row_order - b.row_order);
       // Pad with empty rows up to maxRows so there's always something to fill in
       while (loaded.length < maxRows) {
         loaded = [...loaded, { id: null, row_order: loaded.length, col1_value: "", col2_value: "", col3_value: "" }];
@@ -91,22 +95,33 @@ function StockTakeTable({ item, auditId }) {
     if (!auditId) return;
     clearTimeout(saveTimers.current[rowIdx]);
     saveTimers.current[rowIdx] = setTimeout(async () => {
-      const row = rows[rowIdx];
-      const updated = { ...row, [field]: value };
-      const payload = {
-        audit_id: auditId,
-        item_id: item.id,
-        row_order: rowIdx,
-        col1_value: updated.col1_value || null,
-        col2_value: updated.col2_value || null,
-        col3_value: updated.col3_value || null,
-      };
-      if (row.id) {
-        await supabase.from("stock_checks").update(payload).eq("id", row.id);
-      } else {
-        const { data } = await supabase.from("stock_checks").insert([payload]).select().single();
-        if (data) setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, id: data.id } : r));
+      // Wait for any insert already in progress for this row, so we update instead of inserting again
+      if (insertInFlight.current[rowIdx]) {
+        await insertInFlight.current[rowIdx];
       }
+      setRows((currentRows) => {
+        const row = currentRows[rowIdx];
+        const updated = { ...row, [field]: value };
+        const payload = {
+          audit_id: auditId,
+          item_id: item.id,
+          row_order: rowIdx,
+          col1_value: updated.col1_value || null,
+          col2_value: updated.col2_value || null,
+          col3_value: updated.col3_value || null,
+        };
+        if (row.id) {
+          supabase.from("stock_checks").update(payload).eq("id", row.id);
+        } else {
+          const insertPromise = supabase.from("stock_checks").insert([payload]).select().single().then(({ data }) => {
+            if (data) setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, id: data.id } : r));
+            delete insertInFlight.current[rowIdx];
+            return data?.id;
+          });
+          insertInFlight.current[rowIdx] = insertPromise;
+        }
+        return currentRows;
+      });
     }, 500);
   }
 
