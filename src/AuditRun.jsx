@@ -196,11 +196,12 @@ export default function AuditRun({ session, locationId, templateId, location, te
   const progress = countableItems.length > 0 ? Math.round((answered.length / countableItems.length) * 100) : 0;
 
   // Score
-  const scoreItems = allItems.filter((i) => (i.answer_type === "score" || !i.answer_type) && (itemOptions[i.id]||[]).some((o) => o.score !== null));
-  const naAnswers = scoreItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.label?.toLowerCase() === "n/a"; });
+  const scoreItems = allItems.filter((i) => (i.answer_type === "score" || !i.answer_type) && (itemOptions[i.id]||[]).length > 0);
+  const naAnswers = scoreItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_na; });
   const relevantMax = (scoreItems.length - naAnswers.length) * 5;
-  const achieved = scoreItems.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && opt.label?.toLowerCase() !== "n/a"; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0); }, 0);
+  const achieved = scoreItems.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && !opt.is_na; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0); }, 0);
   const pct = relevantMax > 0 ? Math.round((achieved / relevantMax) * 100) : 0;
+  const actionItems = allItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_action_item; });
 
   function setResponse(id, val) { setResponses((p) => ({ ...p, [id]: val })); }
 

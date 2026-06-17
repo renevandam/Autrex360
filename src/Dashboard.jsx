@@ -149,7 +149,7 @@ function Locations() {
 function AnswerSetDetail({ set, onBack }) {
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ label: "", value: "", score: "", color: OPTION_COLORS[0] });
+  const [form, setForm] = useState({ label: "", value: "", score: "", color: OPTION_COLORS[0], is_action_item: false, is_na: false });
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -164,8 +164,14 @@ function AnswerSetDetail({ set, onBack }) {
 
   async function addOption() {
     if (!form.label.trim()) return;
-    await supabase.from("answer_options").insert([{ set_id: set.id, label: form.label, value: form.value || form.label.toLowerCase().replace(/\s+/g, "_"), score: form.score !== "" ? parseInt(form.score) : null, color: form.color, sort_order: options.length }]);
-    setForm({ label: "", value: "", score: "", color: OPTION_COLORS[options.length % OPTION_COLORS.length] });
+    await supabase.from("answer_options").insert([{
+      set_id: set.id, label: form.label,
+      value: form.value || form.label.toLowerCase().replace(/\s+/g, "_"),
+      score: form.is_na ? null : (form.score !== "" ? parseInt(form.score) : null),
+      color: form.color, sort_order: options.length,
+      is_action_item: form.is_action_item, is_na: form.is_na,
+    }]);
+    setForm({ label: "", value: "", score: "", color: OPTION_COLORS[options.length % OPTION_COLORS.length], is_action_item: false, is_na: false });
     setAdding(false);
     await load();
   }
@@ -177,18 +183,35 @@ function AnswerSetDetail({ set, onBack }) {
 
   function startEdit(opt) {
     setEditingId(opt.id);
-    setEditForm({ label: opt.label, score: opt.score !== null ? String(opt.score) : "", color: opt.color || OPTION_COLORS[0] });
+    setEditForm({ label: opt.label, score: opt.score !== null ? String(opt.score) : "", color: opt.color || OPTION_COLORS[0], is_action_item: !!opt.is_action_item, is_na: !!opt.is_na });
   }
   function cancelEdit() { setEditingId(null); setEditForm({}); }
   async function saveEdit() {
     if (!editForm.label?.trim()) return;
     await supabase.from("answer_options").update({
       label: editForm.label,
-      score: editForm.score !== "" ? parseInt(editForm.score) : null,
+      score: editForm.is_na ? null : (editForm.score !== "" ? parseInt(editForm.score) : null),
       color: editForm.color,
+      is_action_item: editForm.is_action_item,
+      is_na: editForm.is_na,
     }).eq("id", editingId);
     setEditingId(null); setEditForm({});
     await load();
+  }
+
+  function FlagCheckboxes({ data, setData }) {
+    return (
+      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 16, marginTop: 4 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#555" }}>
+          <input type="checkbox" checked={data.is_action_item} onChange={(e) => setData((f) => ({ ...f, is_action_item: e.target.checked }))} style={{ accentColor: "#E24B4A" }} />
+          Actiepunt (Immediate Action)
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#555" }}>
+          <input type="checkbox" checked={data.is_na} onChange={(e) => setData((f) => ({ ...f, is_na: e.target.checked }))} style={{ accentColor: "#378ADD" }} />
+          Telt niet mee (N/A)
+        </label>
+      </div>
+    );
   }
 
   return (
@@ -211,8 +234,8 @@ function AnswerSetDetail({ set, onBack }) {
                     <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
                   </div>
                   <div>
-                    <div style={s.label}>Score (optioneel)</div>
-                    <input type="number" value={editForm.score} onChange={(e) => setEditForm((f) => ({ ...f, score: e.target.value }))} style={s.input} placeholder="bijv. 3" />
+                    <div style={s.label}>Score {editForm.is_na && "(uitgeschakeld - N/A)"}</div>
+                    <input type="number" disabled={editForm.is_na} value={editForm.score} onChange={(e) => setEditForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: editForm.is_na ? 0.5 : 1 }} placeholder="bijv. 3" />
                   </div>
                   <div>
                     <div style={s.label}>Kleur</div>
@@ -222,6 +245,7 @@ function AnswerSetDetail({ set, onBack }) {
                       ))}
                     </div>
                   </div>
+                  <FlagCheckboxes data={editForm} setData={setEditForm} />
                 </div>
                 <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                   <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Opslaan</button>
@@ -234,6 +258,8 @@ function AnswerSetDetail({ set, onBack }) {
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</span>
                   {opt.score !== null && <span style={{ fontSize: 11, color: "#aaa", marginLeft: 8 }}>{opt.score} pt</span>}
+                  {opt.is_action_item && <span style={{ fontSize: 10, marginLeft: 6, padding: "1px 6px", borderRadius: 8, background: "#FCEBEB", color: "#A32D2D", fontWeight: 500 }}>Actiepunt</span>}
+                  {opt.is_na && <span style={{ fontSize: 10, marginLeft: 6, padding: "1px 6px", borderRadius: 8, background: "#E6F1FB", color: "#0C447C", fontWeight: 500 }}>N/A</span>}
                 </div>
                 <button onClick={() => startEdit(opt)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
                 <button onClick={() => removeOption(opt.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
@@ -249,8 +275,8 @@ function AnswerSetDetail({ set, onBack }) {
                   <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={s.input} placeholder="bijv. Satisfactory" autoFocus />
                 </div>
                 <div>
-                  <div style={s.label}>Score (optioneel)</div>
-                  <input type="number" value={form.score} onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))} style={s.input} placeholder="bijv. 3" />
+                  <div style={s.label}>Score {form.is_na && "(uitgeschakeld - N/A)"}</div>
+                  <input type="number" disabled={form.is_na} value={form.score} onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: form.is_na ? 0.5 : 1 }} placeholder="bijv. 3" />
                 </div>
                 <div>
                   <div style={s.label}>Kleur</div>
@@ -260,6 +286,7 @@ function AnswerSetDetail({ set, onBack }) {
                     ))}
                   </div>
                 </div>
+                <FlagCheckboxes data={form} setData={setForm} />
               </div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <button style={s.btn(true)} onClick={addOption}><i className="ti ti-check" /> Toevoegen</button>
@@ -287,7 +314,6 @@ function AnswerSetDetail({ set, onBack }) {
     </div>
   );
 }
-
 // ── Answer Sets list ──────────────────────────────────────
 function AnswerSets() {
   const [sets, setSets] = useState([]);
