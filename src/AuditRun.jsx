@@ -70,16 +70,13 @@ function StockTakeTable({ item, auditId }) {
   const col2 = item.stock_col2_label || "Binlocatie";
   const col3 = item.stock_col3_label || "Aantal";
   const saveTimers = useRef({});
-  const insertInFlight = useRef({}); // rowIdx -> Promise resolving to the row's db id, so concurrent saves don't double-insert
+  const pendingValues = useRef({}); // rowIdx -> latest {field: value} not yet flushed to the db
 
   useEffect(() => {
     async function load() {
       if (!auditId) { setLoading(false); return; }
       const { data } = await supabase.from("stock_checks").select("*").eq("audit_id", auditId).eq("item_id", item.id).order("row_order");
-      // De-duplicate by row_order in case old duplicate rows exist; keep the most recently created one
-      const byOrder = {};
-      (data || []).forEach((r) => { byOrder[r.row_order] = r; });
-      let loaded = Object.values(byOrder).sort((a, b) => a.row_order - b.row_order);
+      let loaded = (data || []).sort((a, b) => a.row_order - b.row_order);
       // Pad with empty rows up to maxRows so there's always something to fill in
       while (loaded.length < maxRows) {
         loaded = [...loaded, { id: null, row_order: loaded.length, col1_value: "", col2_value: "", col3_value: "" }];
@@ -93,33 +90,30 @@ function StockTakeTable({ item, auditId }) {
   function updateCell(rowIdx, field, value) {
     setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, [field]: value } : r));
     if (!auditId) return;
+    pendingValues.current[rowIdx] = { ...(pendingValues.current[rowIdx] || {}), [field]: value };
     clearTimeout(saveTimers.current[rowIdx]);
     saveTimers.current[rowIdx] = setTimeout(async () => {
-      // Wait for any insert already in progress for this row, so we update instead of inserting again
-      if (insertInFlight.current[rowIdx]) {
-        await insertInFlight.current[rowIdx];
-      }
+      const pending = pendingValues.current[rowIdx] || {};
+      delete pendingValues.current[rowIdx];
+      // Read current row state at flush time (not at keystroke time) to merge with whatever else changed
       setRows((currentRows) => {
-        const row = currentRows[rowIdx];
-        const updated = { ...row, [field]: value };
+        const row = { ...currentRows[rowIdx], ...pending };
         const payload = {
           audit_id: auditId,
           item_id: item.id,
           row_order: rowIdx,
-          col1_value: updated.col1_value || null,
-          col2_value: updated.col2_value || null,
-          col3_value: updated.col3_value || null,
+          col1_value: row.col1_value || null,
+          col2_value: row.col2_value || null,
+          col3_value: row.col3_value || null,
         };
-        if (row.id) {
-          supabase.from("stock_checks").update(payload).eq("id", row.id);
-        } else {
-          const insertPromise = supabase.from("stock_checks").insert([payload]).select().single().then(({ data }) => {
+        // True upsert on the (audit_id, item_id, row_order) unique constraint - no more manual insert/update race
+        supabase.from("stock_checks")
+          .upsert(payload, { onConflict: "audit_id,item_id,row_order" })
+          .select()
+          .single()
+          .then(({ data }) => {
             if (data) setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, id: data.id } : r));
-            delete insertInFlight.current[rowIdx];
-            return data?.id;
           });
-          insertInFlight.current[rowIdx] = insertPromise;
-        }
         return currentRows;
       });
     }, 500);
