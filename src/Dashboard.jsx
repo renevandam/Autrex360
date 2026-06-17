@@ -763,6 +763,15 @@ function Audits({ onNewAudit, onResumeAudit }) {
   }
   useEffect(() => { load(); }, []);
 
+  async function remove(id) {
+    if (!confirm("Deze audit en alle bijbehorende antwoorden permanent verwijderen?")) return;
+    await supabase.from("audit_responses").delete().eq("audit_id", id);
+    await supabase.from("stock_checks").delete().eq("audit_id", id);
+    await supabase.from("signatures").delete().eq("audit_id", id);
+    await supabase.from("audits").delete().eq("id", id);
+    await load();
+  }
+
   const statusColor = { draft: "#EF9F27", submitted: "#1D9E75" };
   const statusLabel = { draft: "Concept", submitted: "Ingediend" };
 
@@ -793,7 +802,10 @@ function Audits({ onNewAudit, onResumeAudit }) {
                   {audit.score_pct !== null && <span style={s.badge("#378ADD")}>{audit.score_pct}%</span>}
                 </div>
               </div>
-              {audit.status === "draft" && <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button onClick={(e) => { e.stopPropagation(); remove(audit.id); }} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                {audit.status === "draft" && <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />}
+              </div>
             </div>
           </div>
         ))}
