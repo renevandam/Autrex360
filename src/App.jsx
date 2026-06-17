@@ -22,6 +22,16 @@ export default function App() {
     <Dashboard
       session={session}
       onStartAudit={() => setScreen("start")}
+      onResumeAudit={(audit) => {
+        setAuditParams({
+          auditId: audit.id,
+          locationId: audit.location_id,
+          templateId: audit.template_id,
+          location: audit.locations,
+          template: audit.audit_templates,
+        });
+        setScreen("run");
+      }}
     />
   );
 
@@ -36,6 +46,7 @@ export default function App() {
   if (screen === "run" && auditParams) return (
     <AuditRun
       session={session}
+      auditId={auditParams.auditId}
       locationId={auditParams.locationId}
       templateId={auditParams.templateId}
       location={auditParams.location}

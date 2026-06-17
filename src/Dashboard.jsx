@@ -751,13 +751,13 @@ function Templates() {
 }
 
 // ── Audits ───────────────────────────────────────────────
-function Audits({ onNewAudit }) {
+function Audits({ onNewAudit, onResumeAudit }) {
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from("audits").select("*, locations(name)").order("created_at", { ascending: false });
+    const { data } = await supabase.from("audits").select("*, locations(id,name), audit_templates(id,name)").order("created_at", { ascending: false });
     setAudits(data || []);
     setLoading(false);
   }
@@ -775,20 +775,25 @@ function Audits({ onNewAudit }) {
       {loading ? <div style={s.empty}>Laden...</div>
         : audits.length === 0 ? <div style={s.empty}><i className="ti ti-clipboard-list" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Nog geen audits.</div>
         : audits.map((audit) => (
-          <div key={audit.id} style={s.card}>
+          <div
+            key={audit.id}
+            style={{ ...s.card, cursor: audit.status === "draft" ? "pointer" : "default" }}
+            onClick={() => { if (audit.status === "draft" && onResumeAudit) onResumeAudit(audit); }}
+          >
             <div style={s.row}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{audit.locations?.name || "Onbekende locatie"}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
                   <i className="ti ti-calendar" style={{ fontSize: 12 }} /> {new Date(audit.audit_date).toLocaleDateString("nl-NL")}
                   {audit.auditor_name && <> · {audit.auditor_name}</>}
+                  {audit.audit_templates?.name && <> · {audit.audit_templates.name}</>}
                 </div>
                 <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
                   <span style={s.badge(statusColor[audit.status] || "#aaa")}>{statusLabel[audit.status] || audit.status}</span>
                   {audit.score_pct !== null && <span style={s.badge("#378ADD")}>{audit.score_pct}%</span>}
                 </div>
               </div>
-              <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />
+              {audit.status === "draft" && <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />}
             </div>
           </div>
         ))}
@@ -797,7 +802,7 @@ function Audits({ onNewAudit }) {
 }
 
 // ── Dashboard main ────────────────────────────────────────
-export default function Dashboard({ session, onStartAudit }) {
+export default function Dashboard({ session, onStartAudit, onResumeAudit }) {
   const [page, setPage] = useState("home");
   const [locCount, setLocCount] = useState(0);
   const [tplCount, setTplCount] = useState(0);
@@ -831,7 +836,7 @@ export default function Dashboard({ session, onStartAudit }) {
       {page === "locations"  && <Locations />}
       {page === "answersets" && <AnswerSets />}
       {page === "templates"  && <Templates />}
-      {page === "audits"     && <Audits onNewAudit={onStartAudit} />}
+      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} />}
     </div>
   );
 }

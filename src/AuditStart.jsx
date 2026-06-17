@@ -7,6 +7,7 @@ export default function AuditStart({ session, onStart, onBack }) {
   const [locationId, setLocationId] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -20,6 +21,29 @@ export default function AuditStart({ session, onStart, onBack }) {
     }
     load();
   }, []);
+
+  async function handleStart() {
+    if (starting) return;
+    setStarting(true);
+    const { data: audit, error } = await supabase.from("audits").insert([{
+      location_id: locationId,
+      template_id: templateId,
+      auditor_name: session.user.email,
+      audit_date: new Date().toISOString().slice(0, 10),
+      status: "draft",
+    }]).select().single();
+    setStarting(false);
+    if (error || !audit) {
+      alert("Kon de audit niet aanmaken: " + (error?.message || "onbekende fout"));
+      return;
+    }
+    onStart({
+      auditId: audit.id,
+      locationId, templateId,
+      location: locations.find((l) => l.id === locationId),
+      template: templates.find((t) => t.id === templateId),
+    });
+  }
 
   const s = {
     wrap: { fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" },
@@ -95,11 +119,11 @@ export default function AuditStart({ session, onStart, onBack }) {
             </div>
 
             <button
-              style={canStart ? s.startBtn : s.startBtnDisabled}
-              disabled={!canStart}
-              onClick={() => onStart({ locationId, templateId, location: locations.find((l) => l.id === locationId), template: templates.find((t) => t.id === templateId) })}
+              style={canStart && !starting ? s.startBtn : s.startBtnDisabled}
+              disabled={!canStart || starting}
+              onClick={handleStart}
             >
-              <i className="ti ti-clipboard-check" /> Audit starten
+              <i className="ti ti-clipboard-check" /> {starting ? "Audit aanmaken..." : "Audit starten"}
             </button>
           </>
         )}

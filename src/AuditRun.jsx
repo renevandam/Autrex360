@@ -129,7 +129,7 @@ function AnswerInput({ item, options, value, onChange }) {
 }
 
 // ── Main AuditRun ─────────────────────────────────────────
-export default function AuditRun({ session, locationId, templateId, location, template, onBack }) {
+export default function AuditRun({ session, auditId, locationId, templateId, location, template, onBack }) {
   const [sections, setSections] = useState([]);
   const [itemOptions, setItemOptions] = useState({});
   const [responses, setResponses] = useState({});
@@ -141,6 +141,8 @@ export default function AuditRun({ session, locationId, templateId, location, te
   const [editOpen, setEditOpen] = useState(false);
   const [locData, setLocData] = useState({ name: location?.name||"", street: "", city: "", detail: "" });
   const [editDraft, setEditDraft] = useState({ ...locData });
+  const [submitting, setSubmitting] = useState(false);
+  const saveTimers = useRef({});
 
   useEffect(() => {
     async function load() {
@@ -164,10 +166,20 @@ export default function AuditRun({ session, locationId, templateId, location, te
       (itemsRaw||[]).forEach((item) => { itemOpts[item.id] = item.answer_set_id ? (optionsMap[item.answer_set_id]||[]) : []; });
       setSections(secs.map((s) => ({ ...s, items: grouped[s.id]||[] })));
       setItemOptions(itemOpts);
+
+      // Load any previously saved responses for this audit (resume a draft)
+      if (auditId) {
+        const { data: savedResponses } = await supabase.from("audit_responses").select("item_id, response").eq("audit_id", auditId);
+        if (savedResponses && savedResponses.length > 0) {
+          const restored = {};
+          savedResponses.forEach((r) => { restored[r.item_id] = r.response; });
+          setResponses(restored);
+        }
+      }
       setLoading(false);
     }
     load();
-  }, [locationId, templateId]);
+  }, [locationId, templateId, auditId]);
 
   const rawItems = sections.flatMap((s) => s.items);
 
@@ -193,7 +205,37 @@ export default function AuditRun({ session, locationId, templateId, location, te
   const pct = relevantMax > 0 ? Math.round((achieved / relevantMax) * 100) : 0;
   const actionItems = allItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_action_item; });
 
-  function setResponse(id, val) { setResponses((p) => ({ ...p, [id]: val })); }
+  function setResponse(id, val) {
+    setResponses((p) => ({ ...p, [id]: val }));
+    if (!auditId) return;
+    // Debounce per-item so rapid changes (e.g. slider drag) don't spam the database
+    clearTimeout(saveTimers.current[id]);
+    saveTimers.current[id] = setTimeout(async () => {
+      const responseText = typeof val === "boolean" ? String(val) : String(val ?? "");
+      await supabase.from("audit_responses").upsert(
+        { audit_id: auditId, item_id: id, response: responseText },
+        { onConflict: "audit_id,item_id" }
+      );
+    }, 500);
+  }
+
+  async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
+    if (auditId) {
+      await supabase.from("audits").update({
+        status: "submitted",
+        score_achieved: relevantMax > 0 ? Math.round(achieved) : null,
+        score_max: relevantMax > 0 ? Math.round(relevantMax) : null,
+        score_pct: relevantMax > 0 ? pct : null,
+        address_verified: addrVerified,
+        capacity_pct: null,
+        submitted_at: new Date().toISOString(),
+      }).eq("id", auditId);
+    }
+    setSubmitting(false);
+    setView("success");
+  }
 
   if (loading) return (
     <div style={{ fontFamily:"system-ui,sans-serif",maxWidth:680,margin:"0 auto",padding:"3rem",textAlign:"center",color:"#aaa" }}>
@@ -336,8 +378,8 @@ export default function AuditRun({ session, locationId, templateId, location, te
 
       {/* SUBMIT */}
       <div style={{ padding:"1rem 1.25rem" }}>
-        <button style={{ width:"100%",padding:11,background:"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }} onClick={()=>setView("success")}>
-          <i className="ti ti-send" /> Audit indienen
+        <button disabled={submitting} style={{ width:"100%",padding:11,background:submitting?"#9ccab8":"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:14,fontWeight:500,cursor:submitting?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }} onClick={handleSubmit}>
+          <i className="ti ti-send" /> {submitting ? "Bezig met indienen..." : "Audit indienen"}
         </button>
       </div>
     </div>
