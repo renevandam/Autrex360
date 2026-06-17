@@ -516,7 +516,6 @@ function TemplateDetail({ template, onBack }) {
                 <button style={s.btn(true)} onClick={addSection}><i className="ti ti-check" /> Toevoegen</button>
                 <button style={s.btn(false)} onClick={() => { setAddingSection(false); setNewSectionName(""); }}>Annuleren</button>
               </div>
-              </div>
             </div>
           ) : (
             <button style={s.btn(true)} onClick={() => setAddingSection(true)}><i className="ti ti-plus" /> Sectie toevoegen</button>
