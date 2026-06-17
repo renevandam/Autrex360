@@ -17,6 +17,7 @@ const ANSWER_TYPES = [
   { value: "number",    label: "Getal" },
   { value: "text",      label: "Tekst" },
   { value: "slider",    label: "Slider (0-100%)" },
+  { value: "signature", label: "Handtekening" },
 ];
 
 const OPTION_COLORS = ["#E24B4A","#E07B3A","#EF9F27","#639922","#1D9E75","#378ADD","#888"];
