@@ -61,6 +61,87 @@ function SignaturePad({ label }) {
   );
 }
 
+// ── Stock take table ──────────────────────────────────────
+function StockTakeTable({ item, auditId }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const maxRows = item.stock_max_rows || 5;
+  const col1 = item.stock_col1_label || "Artikelnummer";
+  const col2 = item.stock_col2_label || "Binlocatie";
+  const col3 = item.stock_col3_label || "Aantal";
+  const saveTimers = useRef({});
+
+  useEffect(() => {
+    async function load() {
+      if (!auditId) { setLoading(false); return; }
+      const { data } = await supabase.from("stock_checks").select("*").eq("audit_id", auditId).eq("item_id", item.id).order("row_order");
+      let loaded = data || [];
+      // Pad with empty rows up to maxRows so there's always something to fill in
+      while (loaded.length < maxRows) {
+        loaded = [...loaded, { id: null, row_order: loaded.length, col1_value: "", col2_value: "", col3_value: "" }];
+      }
+      setRows(loaded.slice(0, maxRows));
+      setLoading(false);
+    }
+    load();
+  }, [auditId, item.id, maxRows]);
+
+  function updateCell(rowIdx, field, value) {
+    setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, [field]: value } : r));
+    if (!auditId) return;
+    clearTimeout(saveTimers.current[rowIdx]);
+    saveTimers.current[rowIdx] = setTimeout(async () => {
+      const row = rows[rowIdx];
+      const updated = { ...row, [field]: value };
+      const payload = {
+        audit_id: auditId,
+        item_id: item.id,
+        row_order: rowIdx,
+        col1_value: updated.col1_value || null,
+        col2_value: updated.col2_value || null,
+        col3_value: updated.col3_value || null,
+      };
+      if (row.id) {
+        await supabase.from("stock_checks").update(payload).eq("id", row.id);
+      } else {
+        const { data } = await supabase.from("stock_checks").insert([payload]).select().single();
+        if (data) setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, id: data.id } : r));
+      }
+    }, 500);
+  }
+
+  if (loading) return <div style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>Tabel laden...</div>;
+
+  return (
+    <div style={{ marginTop: 8, overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            {[col1, col2, col3].map((h) => (
+              <th key={h} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr key={idx}>
+              <td style={{ padding: "4px 4px" }}>
+                <input value={row.col1_value || ""} onChange={(e) => updateCell(idx, "col1_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white" }} />
+              </td>
+              <td style={{ padding: "4px 4px" }}>
+                <input value={row.col2_value || ""} onChange={(e) => updateCell(idx, "col2_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white" }} />
+              </td>
+              <td style={{ padding: "4px 4px", width: 90 }}>
+                <input type="number" value={row.col3_value || ""} onChange={(e) => updateCell(idx, "col3_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white", textAlign: "center" }} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Answer input per type ─────────────────────────────────
 function AnswerInput({ item, options, value, onChange }) {
   const type = item.answer_type || "score";
@@ -200,7 +281,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
 
   const allItems = rawItems.filter(isVisible);
   // exclude signature type from progress count
-  const countableItems = allItems.filter((i) => i.answer_type !== "signature");
+  const countableItems = allItems.filter((i) => i.answer_type !== "signature" && i.answer_type !== "stock_take");
   const answered = countableItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "");
   const progress = countableItems.length > 0 ? Math.round((answered.length / countableItems.length) * 100) : 0;
 
@@ -375,13 +456,17 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
                     {item.sub_label && <div style={{ fontSize:11,color:"#aaa" }}>{item.sub_label}</div>}
                   </>
                 )}
-                <AnswerInput
-                  item={item}
-                  options={itemOptions[item.id]||[]}
-                  value={responses[item.id]}
-                  onChange={(val) => setResponse(item.id, val)}
-                />
-                {item.answer_type !== "signature" && (
+                {item.answer_type === "stock_take" ? (
+                  <StockTakeTable item={item} auditId={auditId} />
+                ) : (
+                  <AnswerInput
+                    item={item}
+                    options={itemOptions[item.id]||[]}
+                    value={responses[item.id]}
+                    onChange={(val) => setResponse(item.id, val)}
+                  />
+                )}
+                {item.answer_type !== "signature" && item.answer_type !== "stock_take" && (
                   photos[item.id]
                     ? <div style={{ fontSize:11,color:"#0F6E56",marginTop:6,display:"flex",alignItems:"center",gap:4 }}><i className="ti ti-photo-check" /> 1 foto toegevoegd</div>
                     : <button style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#888",border:"0.5px dashed #ccc",borderRadius:6,padding:"4px 8px",background:"none",cursor:"pointer",marginTop:6 }} onClick={()=>setPhotos((p)=>({...p,[item.id]:true}))}><i className="ti ti-camera" /> Foto toevoegen</button>

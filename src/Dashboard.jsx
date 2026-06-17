@@ -10,12 +10,13 @@ const NAV = [
 ];
 
 const ANSWER_TYPES = [
-  { value: "score",     label: "Antwoordset" },
-  { value: "checkbox",  label: "Checkbox" },
-  { value: "number",    label: "Getal" },
-  { value: "text",      label: "Tekst" },
-  { value: "slider",    label: "Slider (0-100%)" },
-  { value: "signature", label: "Handtekening" },
+  { value: "score",      label: "Antwoordset" },
+  { value: "checkbox",   label: "Checkbox" },
+  { value: "number",     label: "Getal" },
+  { value: "text",       label: "Tekst" },
+  { value: "slider",     label: "Slider (0-100%)" },
+  { value: "signature",  label: "Handtekening" },
+  { value: "stock_take", label: "Stock take (tabel)" },
 ];
 
 const OPTION_COLORS = ["#E24B4A","#E07B3A","#EF9F27","#639922","#1D9E75","#378ADD","#888"];
@@ -449,12 +450,14 @@ function TemplateDetail({ template, onBack }) {
     await supabase.from("template_sections").delete().eq("id", id); await load();
   }
 
+  const defaultItemForm = { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5" };
+
   function toggleItemForm(sectionId) {
-    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
+    setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
   }
   function updateItemForm(sectionId, field, value) {
     setNewItemForms((f) => {
-      const current = f[sectionId] || { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "" };
+      const current = f[sectionId] || defaultItemForm;
       const updated = { ...current, [field]: value, open: true };
       if (field === "depends_on_item_id") updated.depends_on_value = ""; // reset trigger value when target question changes
       return { ...f, [sectionId]: updated };
@@ -473,9 +476,13 @@ function TemplateDetail({ template, onBack }) {
       weight: form.weight ? parseFloat(form.weight) : 1,
       depends_on_item_id: form.depends_on_item_id || null,
       depends_on_value: form.depends_on_item_id && form.depends_on_value ? form.depends_on_value : null,
+      stock_col1_label: form.stock_col1_label || "Artikelnummer",
+      stock_col2_label: form.stock_col2_label || "Binlocatie",
+      stock_col3_label: form.stock_col3_label || "Aantal",
+      stock_max_rows: form.stock_max_rows ? parseInt(form.stock_max_rows) : 5,
       sort_order: (items[sectionId] || []).length,
     }]);
-    setNewItemForms((f) => ({ ...f, [sectionId]: { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", open: false } }));
+    setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, open: false } }));
     await load();
   }
   async function removeItem(id) {
@@ -489,6 +496,10 @@ function TemplateDetail({ template, onBack }) {
       label: item.label, sub_label: item.sub_label || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "",
       weight: item.weight !== null && item.weight !== undefined ? String(item.weight) : "1",
       depends_on_item_id: item.depends_on_item_id || "", depends_on_value: item.depends_on_value || "",
+      stock_col1_label: item.stock_col1_label || "Artikelnummer",
+      stock_col2_label: item.stock_col2_label || "Binlocatie",
+      stock_col3_label: item.stock_col3_label || "Aantal",
+      stock_max_rows: item.stock_max_rows !== null && item.stock_max_rows !== undefined ? String(item.stock_max_rows) : "5",
       _sectionId: item.section_id,
     });
   }
@@ -503,6 +514,10 @@ function TemplateDetail({ template, onBack }) {
       weight: editForm.weight ? parseFloat(editForm.weight) : 1,
       depends_on_item_id: editForm.depends_on_item_id || null,
       depends_on_value: editForm.depends_on_item_id && editForm.depends_on_value ? editForm.depends_on_value : null,
+      stock_col1_label: editForm.stock_col1_label || "Artikelnummer",
+      stock_col2_label: editForm.stock_col2_label || "Binlocatie",
+      stock_col3_label: editForm.stock_col3_label || "Aantal",
+      stock_max_rows: editForm.stock_max_rows ? parseInt(editForm.stock_max_rows) : 5,
     }).eq("id", editingItemId);
     setEditingItemId(null); setEditForm({});
     await load();
@@ -549,6 +564,18 @@ function TemplateDetail({ template, onBack }) {
                             <option value="">— Kies een antwoordset —</option>
                             {answerSets.map((as) => <option key={as.id} value={as.id}>{as.name}</option>)}
                           </select>
+                        </>
+                      )}
+                      {editForm.answer_type === "stock_take" && (
+                        <>
+                          <div style={{ ...s.label, marginTop: 8 }}>Kolom 1 (tekst)</div>
+                          <input value={editForm.stock_col1_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col1_label: e.target.value }))} style={s.input} placeholder="bijv. Artikelnummer" />
+                          <div style={{ ...s.label, marginTop: 8 }}>Kolom 2 (tekst)</div>
+                          <input value={editForm.stock_col2_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col2_label: e.target.value }))} style={s.input} placeholder="bijv. Binlocatie" />
+                          <div style={{ ...s.label, marginTop: 8 }}>Kolom 3 (aantal)</div>
+                          <input value={editForm.stock_col3_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col3_label: e.target.value }))} style={s.input} placeholder="bijv. Aantal" />
+                          <div style={{ ...s.label, marginTop: 8 }}>Max. aantal rijen</div>
+                          <input type="number" min="1" max="20" value={editForm.stock_max_rows} onChange={(e) => setEditForm((f) => ({ ...f, stock_max_rows: e.target.value }))} style={s.input} />
                         </>
                       )}
                       <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
@@ -622,6 +649,18 @@ function TemplateDetail({ template, onBack }) {
                         {answerSets.map((as) => <option key={as.id} value={as.id}>{as.name}</option>)}
                       </select>
                       {answerSets.length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ Nog geen antwoordsets. Maak er eerst een aan bij "Antwoordsets".</div>}
+                    </>
+                  )}
+                  {newItemForms[section.id]?.answer_type === "stock_take" && (
+                    <>
+                      <div style={{ ...s.label, marginTop: 8 }}>Kolom 1 (tekst)</div>
+                      <input value={newItemForms[section.id]?.stock_col1_label ?? "Artikelnummer"} onChange={(e) => updateItemForm(section.id, "stock_col1_label", e.target.value)} style={s.input} placeholder="bijv. Artikelnummer" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Kolom 2 (tekst)</div>
+                      <input value={newItemForms[section.id]?.stock_col2_label ?? "Binlocatie"} onChange={(e) => updateItemForm(section.id, "stock_col2_label", e.target.value)} style={s.input} placeholder="bijv. Binlocatie" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Kolom 3 (aantal)</div>
+                      <input value={newItemForms[section.id]?.stock_col3_label ?? "Aantal"} onChange={(e) => updateItemForm(section.id, "stock_col3_label", e.target.value)} style={s.input} placeholder="bijv. Aantal" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Max. aantal rijen</div>
+                      <input type="number" min="1" max="20" value={newItemForms[section.id]?.stock_max_rows ?? "5"} onChange={(e) => updateItemForm(section.id, "stock_max_rows", e.target.value)} style={s.input} />
                     </>
                   )}
                   <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
