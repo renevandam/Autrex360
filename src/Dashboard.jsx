@@ -12,8 +12,6 @@ const NAV = [
 const ANSWER_TYPES = [
   { value: "score",     label: "Antwoordset" },
   { value: "checkbox",  label: "Checkbox" },
-  { value: "yes_no",    label: "Ja / Nee" },
-  { value: "yes_no_na", label: "Ja / Nee / N/A" },
   { value: "number",    label: "Getal" },
   { value: "text",      label: "Tekst" },
   { value: "slider",    label: "Slider (0-100%)" },

@@ -83,26 +83,6 @@ function AnswerInput({ item, options, value, onChange }) {
     );
   }
 
-  if (type === "yes_no") {
-    return (
-      <div style={{ display:"flex",gap:6,marginTop:7 }}>
-        {["Ja","Nee"].map((lbl) => (
-          <button key={lbl} onClick={() => onChange(lbl)} style={{ padding:"5px 14px",borderRadius:20,fontSize:11,fontWeight:500,cursor:"pointer", border:value===lbl?"2px solid #1D9E75":"1.5px solid #bbb", background:value===lbl?"#E1F5EE":"white", color:value===lbl?"#085041":"#555" }}>{lbl}</button>
-        ))}
-      </div>
-    );
-  }
-
-  if (type === "yes_no_na") {
-    return (
-      <div style={{ display:"flex",gap:6,marginTop:7 }}>
-        {["Ja","Nee","N/A"].map((lbl) => (
-          <button key={lbl} onClick={() => onChange(lbl)} style={{ padding:"5px 14px",borderRadius:20,fontSize:11,fontWeight:500,cursor:"pointer", border:value===lbl?"2px solid #1D9E75":"1.5px solid #bbb", background:value===lbl?"#E1F5EE":"white", color:value===lbl?"#085041":"#555" }}>{lbl}</button>
-        ))}
-      </div>
-    );
-  }
-
   if (type === "checkbox") {
     return (
       <label style={{ display:"flex",alignItems:"center",gap:8,marginTop:8,cursor:"pointer" }}>
