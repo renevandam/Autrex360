@@ -175,6 +175,15 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
           savedResponses.forEach((r) => { restored[r.item_id] = r.response; });
           setResponses(restored);
         }
+        const { data: auditRow } = await supabase.from("audits").select("address_verified, address_override").eq("id", auditId).single();
+        if (auditRow) {
+          setAddrVerified(!!auditRow.address_verified);
+          if (auditRow.address_override) {
+            setLocData((prev) => ({ ...prev, ...auditRow.address_override }));
+            setEditDraft((prev) => ({ ...prev, ...auditRow.address_override }));
+            setAddrChanged(true);
+          }
+        }
       }
       setLoading(false);
     }
@@ -217,6 +226,14 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         { onConflict: "audit_id,item_id" }
       );
     }, 500);
+  }
+
+  async function saveAddressState(verified, override) {
+    if (!auditId) return;
+    await supabase.from("audits").update({
+      address_verified: verified,
+      address_override: override && addrChanged ? override : null,
+    }).eq("id", auditId);
   }
 
   async function handleSubmit() {
@@ -318,7 +335,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
           <div style={{ fontSize:12,color:"#888",lineHeight:1.6 }}>{locData.street}<br />{locData.city}{locData.detail&&<><br />{locData.detail}</>}</div>
           <div style={{ display:"flex",alignItems:"center",gap:10,marginTop:10,paddingTop:10,borderTop:"0.5px solid #eee",flexWrap:"wrap" }}>
             <label style={{ display:"flex",alignItems:"center",gap:8,cursor:"pointer" }}>
-              <input type="checkbox" checked={addrVerified} onChange={(e)=>{ setAddrVerified(e.target.checked); if(e.target.checked){setEditOpen(false);setAddrChanged(false);} }} style={{ width:15,height:15,accentColor:"#1D9E75" }} />
+              <input type="checkbox" checked={addrVerified} onChange={(e)=>{ const checked=e.target.checked; setAddrVerified(checked); if(checked){setEditOpen(false);setAddrChanged(false);} saveAddressState(checked, locData); }} style={{ width:15,height:15,accentColor:"#1D9E75" }} />
               <span style={{ fontSize:12 }}>Adres is correct en actueel</span>
             </label>
             <button onClick={()=>{ if(!editOpen){setEditDraft({...locData});setAddrVerified(false);setAddrChanged(true);} setEditOpen((v)=>!v); }} style={{ fontSize:11,color:editOpen?"#633806":"#185FA5",border:`0.5px solid ${editOpen?"#EF9F27":"#378ADD"}`,borderRadius:6,padding:"4px 9px",background:editOpen?"#FAEEDA":"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4 }}>
@@ -330,7 +347,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
               {[["Bedrijfsnaam","name"],["Straat","street"],["Postcode & stad","city"],["Locatiedetail","detail"]].map(([lbl,key]) => (
                 <div key={key}>
                   <div style={{ fontSize:11,color:"#888",marginBottom:3,marginTop:7 }}>{lbl}</div>
-                  <input value={editDraft[key]} onChange={(e)=>setEditDraft((d)=>({...d,[key]:e.target.value}))} onBlur={()=>{setLocData({...editDraft});setAddrChanged(true);}} style={{ width:"100%",border:"0.5px solid #ddd",borderRadius:6,padding:"6px 9px",fontSize:12,fontFamily:"inherit",background:"white" }} />
+                  <input value={editDraft[key]} onChange={(e)=>setEditDraft((d)=>({...d,[key]:e.target.value}))} onBlur={()=>{ const updated={...editDraft}; setLocData(updated); setAddrChanged(true); saveAddressState(false, updated); }} style={{ width:"100%",border:"0.5px solid #ddd",borderRadius:6,padding:"6px 9px",fontSize:12,fontFamily:"inherit",background:"white" }} />
                 </div>
               ))}
             </div>
