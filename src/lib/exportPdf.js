@@ -148,6 +148,14 @@ export async function exportAuditToPdf(auditId) {
     doc.setTextColor(...GREY);
     doc.text(`${audit.score_achieved ?? "?"} / ${audit.score_max ?? "?"} punten`, margin + 80, y + 24);
     y += 40;
+  } else {
+    y += 6;
+    ensureSpace(20);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(...GREY);
+    doc.text("Score nog niet beschikbaar (audit is nog niet ingediend)", margin, y + 4);
+    y += 20;
   }
 
   // ── Action items summary ──
@@ -169,6 +177,14 @@ export async function exportAuditToPdf(auditId) {
       doc.text(wrapped, margin, y);
       y += wrapped.length * 13 + 4;
     });
+  } else {
+    y += 6;
+    ensureSpace(20);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(...GREEN);
+    doc.text("Geen actiepunten gesignaleerd.", margin, y + 4);
+    y += 20;
   }
 
   // ── Detailed sections ──
