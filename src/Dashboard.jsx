@@ -805,6 +805,10 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [exportingId, setExportingId] = useState(null);
+  const [linkModal, setLinkModal] = useState(null); // { auditId } | null
+  const [linkEmail, setLinkEmail] = useState("");
+  const [generatedLink, setGeneratedLink] = useState(null);
+  const [linkSaving, setLinkSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -813,6 +817,21 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  async function generateLink() {
+    if (!linkEmail.trim() || linkSaving) return;
+    setLinkSaving(true);
+    const { data } = await supabase.from("audit_links").insert([{
+      audit_id: linkModal.auditId,
+      allowed_email: linkEmail.trim().toLowerCase(),
+      status: "open",
+    }]).select().single();
+    if (data) {
+      const url = `${window.location.origin}/audit/${data.token}`;
+      setGeneratedLink(url);
+    }
+    setLinkSaving(false);
+  }
 
   async function handleExport(id) {
     if (exportingId) return;
@@ -876,6 +895,9 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => { setLinkModal({ auditId: audit.id }); setLinkEmail(""); setGeneratedLink(null); }} style={{ fontSize: 12, color: "#888", border: "none", background: "none", cursor: "pointer" }} title="Genereer externe link">
+                  <i className="ti ti-link" />
+                </button>
                 <button onClick={() => handleExport(audit.id)} disabled={exportingId === audit.id} style={{ fontSize: 12, color: "#378ADD", border: "none", background: "none", cursor: exportingId === audit.id ? "not-allowed" : "pointer" }} title="Exporteer als PDF">
                   <i className={`ti ${exportingId === audit.id ? "ti-loader-2" : "ti-file-type-pdf"}`} />
                 </button>
@@ -890,6 +912,39 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
             </div>
           </div>
         ))}
+
+      {/* Link generation modal */}
+      {linkModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 400 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Externe auditlink genereren</div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>De ontvanger moet dit e-mailadres invoeren om de audit te openen.</div>
+            {!generatedLink ? (
+              <>
+                <div style={s.label}>E-mailadres ontvanger *</div>
+                <input type="email" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && generateLink()} style={s.input} placeholder="naam@bedrijf.nl" autoFocus />
+                <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+                  <button style={s.btn(true)} onClick={generateLink} disabled={!linkEmail.trim() || linkSaving}>
+                    <i className="ti ti-link" /> {linkSaving ? "Genereren..." : "Genereer link"}
+                  </button>
+                  <button style={s.btn(false)} onClick={() => setLinkModal(null)}>Annuleren</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, color: "#1D9E75", fontWeight: 600, marginBottom: 8 }}><i className="ti ti-circle-check" /> Link gegenereerd!</div>
+                <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "10px 12px", fontSize: 11, wordBreak: "break-all", color: "#333", marginBottom: 12 }}>{generatedLink}</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={s.btn(true)} onClick={() => { navigator.clipboard.writeText(generatedLink); }}>
+                    <i className="ti ti-copy" /> Kopiëren
+                  </button>
+                  <button style={s.btn(false)} onClick={() => setLinkModal(null)}>Sluiten</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

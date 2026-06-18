@@ -4,13 +4,24 @@ import AuthPage from "./Auth.jsx";
 import Dashboard from "./Dashboard.jsx";
 import AuditStart from "./AuditStart.jsx";
 import AuditRun from "./AuditRun.jsx";
+import PublicAudit from "./PublicAudit.jsx";
+
+// Detect /audit/:token in the URL path — works without any router library
+function getAuditToken() {
+  const match = window.location.pathname.match(/^\/audit\/([a-f0-9]{64})$/i);
+  return match ? match[1] : null;
+}
 
 export default function App() {
   const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null); // { organization_id, role, full_name }
+  const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [screen, setScreen] = useState("dashboard"); // dashboard | start | run
+  const [screen, setScreen] = useState("dashboard");
   const [auditParams, setAuditParams] = useState(null);
+
+  // If the URL is a public audit link, skip auth entirely
+  const publicToken = getAuditToken();
+  if (publicToken) return <PublicAudit token={publicToken} />;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
