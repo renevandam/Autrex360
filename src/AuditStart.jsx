@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 
-export default function AuditStart({ session, onStart, onBack }) {
+export default function AuditStart({ session, profile, onStart, onBack }) {
   const [locations, setLocations] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [locationId, setLocationId] = useState("");
@@ -28,6 +28,7 @@ export default function AuditStart({ session, onStart, onBack }) {
     const { data: audit, error } = await supabase.from("audits").insert([{
       location_id: locationId,
       template_id: templateId,
+      organization_id: profile.organization_id,
       auditor_name: session.user.email,
       audit_date: new Date().toISOString().slice(0, 10),
       status: "draft",

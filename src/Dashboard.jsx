@@ -72,7 +72,7 @@ function Home({ onNav, locCount, tplCount, auditCount, onNewAudit }) {
 }
 
 // ── Locations ────────────────────────────────────────────
-function Locations() {
+function Locations({ profile, canManage }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -89,7 +89,7 @@ function Locations() {
 
   async function save() {
     setSaving(true);
-    await supabase.from("locations").insert([form]);
+    await supabase.from("locations").insert([{ ...form, organization_id: profile.organization_id }]);
     setForm({ name: "", street: "", postal_code: "", city: "", country: "NL", location_detail: "", contact_name: "", contact_email: "" });
     setShowForm(false);
     await load();
@@ -105,11 +105,13 @@ function Locations() {
     <div style={s.page}>
       <div style={s.sTitle}>
         <span>Locaties ({locations.length})</span>
-        <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-          <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
-        </button>
+        {canManage && (
+          <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
+            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+          </button>
+        )}
       </div>
-      {showForm && (
+      {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>Nieuwe locatie</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -136,7 +138,7 @@ function Locations() {
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{loc.street}, {loc.postal_code} {loc.city} {loc.location_detail && `· ${loc.location_detail}`}</div>
                 {loc.contact_name && <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}><i className="ti ti-user" style={{ fontSize: 12 }} /> {loc.contact_name} {loc.contact_email && `· ${loc.contact_email}`}</div>}
               </div>
-              <button onClick={() => remove(loc.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+              {canManage && <button onClick={() => remove(loc.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
             </div>
           </div>
         ))}
@@ -145,7 +147,7 @@ function Locations() {
 }
 
 // ── Answer Set Detail ─────────────────────────────────────
-function AnswerSetDetail({ set, onBack }) {
+function AnswerSetDetail({ set, canManage, onBack }) {
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ label: "", value: "", score: "", color: OPTION_COLORS[0], is_action_item: false, is_na: false });
@@ -260,8 +262,8 @@ function AnswerSetDetail({ set, onBack }) {
                   {opt.is_action_item && <span style={{ fontSize: 10, marginLeft: 6, padding: "1px 6px", borderRadius: 8, background: "#FCEBEB", color: "#A32D2D", fontWeight: 500 }}>Actiepunt</span>}
                   {opt.is_na && <span style={{ fontSize: 10, marginLeft: 6, padding: "1px 6px", borderRadius: 8, background: "#E6F1FB", color: "#0C447C", fontWeight: 500 }}>N/A</span>}
                 </div>
-                <button onClick={() => startEdit(opt)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
-                <button onClick={() => removeOption(opt.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
+                {canManage && <button onClick={() => startEdit(opt)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>}
+                {canManage && <button onClick={() => removeOption(opt.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>}
               </div>
             )
           ))}
@@ -293,7 +295,7 @@ function AnswerSetDetail({ set, onBack }) {
               </div>
             </div>
           ) : (
-            <button style={{ ...s.btnSm, marginTop: options.length > 0 ? 10 : 0 }} onClick={() => setAdding(true)}><i className="ti ti-plus" /> Optie toevoegen</button>
+            canManage && <button style={{ ...s.btnSm, marginTop: options.length > 0 ? 10 : 0 }} onClick={() => setAdding(true)}><i className="ti ti-plus" /> Optie toevoegen</button>
           )}
         </div>
       )}
@@ -314,7 +316,7 @@ function AnswerSetDetail({ set, onBack }) {
   );
 }
 // ── Answer Sets list ──────────────────────────────────────
-function AnswerSets() {
+function AnswerSets({ profile, canManage }) {
   const [sets, setSets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -333,7 +335,7 @@ function AnswerSets() {
   async function save() {
     if (!name.trim()) return;
     setSaving(true);
-    const { data } = await supabase.from("answer_sets").insert([{ name }]).select().single();
+    const { data } = await supabase.from("answer_sets").insert([{ name, organization_id: profile.organization_id }]).select().single();
     setName(""); setShowForm(false);
     await load();
     setSaving(false);
@@ -346,18 +348,20 @@ function AnswerSets() {
     await load();
   }
 
-  if (selected) return <AnswerSetDetail set={selected} onBack={() => { setSelected(null); load(); }} />;
+  if (selected) return <AnswerSetDetail set={selected} canManage={canManage} onBack={() => { setSelected(null); load(); }} />;
 
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
         <span>Antwoordsets ({sets.length})</span>
-        <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-          <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
-        </button>
+        {canManage && (
+          <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
+            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: "#1D9E75" }}>Nieuwe antwoordset</div>
           <div style={s.label}>Naam *</div>
@@ -386,7 +390,7 @@ function AnswerSets() {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button onClick={(e) => { e.stopPropagation(); remove(set.id); }} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                {canManage && <button onClick={(e) => { e.stopPropagation(); remove(set.id); }} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
                 <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />
               </div>
             </div>
@@ -397,7 +401,7 @@ function AnswerSets() {
 }
 
 // ── Template Detail ───────────────────────────────────────
-function TemplateDetail({ template, onBack }) {
+function TemplateDetail({ template, canManage, onBack }) {
   const [sections, setSections] = useState([]);
   const [items, setItems] = useState({});
   const [answerSets, setAnswerSets] = useState([]);
@@ -543,7 +547,7 @@ function TemplateDetail({ template, onBack }) {
             <div key={section.id} style={{ ...s.card, marginBottom: 14 }}>
               <div style={s.row}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{section.name}</div>
-                <button onClick={() => removeSection(section.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                {canManage && <button onClick={() => removeSection(section.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
               </div>
               <div style={{ marginTop: 10 }}>
                 {(items[section.id] || []).map((item, idx) => (
@@ -621,17 +625,19 @@ function TemplateDetail({ template, onBack }) {
                           )}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                        <button onClick={() => startEdit(item)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
-                        <button onClick={() => removeItem(item.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
-                      </div>
+                      {canManage && (
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => startEdit(item)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
+                          <button onClick={() => removeItem(item.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
+                        </div>
+                      )}
                     </div>
                   )
                 ))}
                 {(items[section.id] || []).length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0" }}>Nog geen vragen.</div>}
               </div>
 
-              {newItemForms[section.id]?.open ? (
+              {canManage && (newItemForms[section.id]?.open ? (
                 <div style={{ marginTop: 10, background: "white", border: "0.5px solid #ddd", borderRadius: 8, padding: 10 }}>
                   <div style={s.label}>Vraag *</div>
                   <input value={newItemForms[section.id]?.label || ""} onChange={(e) => updateItemForm(section.id, "label", e.target.value)} style={s.input} placeholder="bijv. Stellingen vrij van schade" />
@@ -687,13 +693,13 @@ function TemplateDetail({ template, onBack }) {
                 </div>
               ) : (
                 <button style={{ ...s.btnSm, marginTop: 10 }} onClick={() => toggleItemForm(section.id)}><i className="ti ti-plus" /> Vraag toevoegen</button>
-              )}
+              ))}
             </div>
           ))}
 
           {sections.length === 0 && <div style={s.empty}><i className="ti ti-list" style={{ fontSize: 28, display: "block", marginBottom: 6 }} />Nog geen secties.</div>}
 
-          {addingSection ? (
+          {canManage && (addingSection ? (
             <div style={{ ...s.card, border: "1px solid #1D9E75" }}>
               <div style={s.label}>Sectienaam</div>
               <input value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} style={s.input} placeholder="bijv. Racking & Opslag" autoFocus />
@@ -704,7 +710,7 @@ function TemplateDetail({ template, onBack }) {
             </div>
           ) : (
             <button style={s.btn(true)} onClick={() => setAddingSection(true)}><i className="ti ti-plus" /> Sectie toevoegen</button>
-          )}
+          ))}
         </>
       )}
     </div>
@@ -712,7 +718,7 @@ function TemplateDetail({ template, onBack }) {
 }
 
 // ── Templates list ─────────────────────────────────────────
-function Templates() {
+function Templates({ profile, canManage }) {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -730,7 +736,7 @@ function Templates() {
 
   async function save() {
     setSaving(true);
-    await supabase.from("audit_templates").insert([{ ...form, is_active: true }]);
+    await supabase.from("audit_templates").insert([{ ...form, is_active: true, organization_id: profile.organization_id }]);
     setForm({ name: "", description: "" }); setShowForm(false);
     await load(); setSaving(false);
   }
@@ -739,17 +745,19 @@ function Templates() {
     await supabase.from("audit_templates").delete().eq("id", id); await load();
   }
 
-  if (selected) return <TemplateDetail template={selected} onBack={() => { setSelected(null); load(); }} />;
+  if (selected) return <TemplateDetail template={selected} canManage={canManage} onBack={() => { setSelected(null); load(); }} />;
 
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
         <span>Templates ({templates.length})</span>
-        <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-          <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
-        </button>
+        {canManage && (
+          <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
+            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+          </button>
+        )}
       </div>
-      {showForm && (
+      {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>Nieuw template</div>
           <div style={{ marginBottom: 10 }}>
@@ -779,7 +787,7 @@ function Templates() {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button onClick={(e) => { e.stopPropagation(); remove(tpl.id); }} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                {canManage && <button onClick={(e) => { e.stopPropagation(); remove(tpl.id); }} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
                 <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />
               </div>
             </div>
@@ -790,7 +798,7 @@ function Templates() {
 }
 
 // ── Audits ───────────────────────────────────────────────
-function Audits({ onNewAudit, onResumeAudit }) {
+function Audits({ onNewAudit, onResumeAudit, canDelete }) {
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -842,7 +850,7 @@ function Audits({ onNewAudit, onResumeAudit }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <button onClick={(e) => { e.stopPropagation(); remove(audit.id); }} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                {canDelete && <button onClick={(e) => { e.stopPropagation(); remove(audit.id); }} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
                 {audit.status === "draft" && <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />}
               </div>
             </div>
@@ -853,11 +861,22 @@ function Audits({ onNewAudit, onResumeAudit }) {
 }
 
 // ── Dashboard main ────────────────────────────────────────
-export default function Dashboard({ session, onStartAudit, onResumeAudit }) {
+const ROLE_LABEL = { admin: "Admin", manager: "Manager", auditor: "Auditor", viewer: "Viewer" };
+const CAN_MANAGE = ["admin", "manager"]; // who can create/edit/delete locations, templates, answer sets
+const CAN_DELETE_AUDIT = ["admin"];
+
+function navForRole(role) {
+  if (role === "viewer") return NAV.filter((n) => n.id !== "answersets"); // viewers don't manage config
+  return NAV;
+}
+
+export default function Dashboard({ session, profile, onStartAudit, onResumeAudit }) {
   const [page, setPage] = useState("home");
   const [locCount, setLocCount] = useState(0);
   const [tplCount, setTplCount] = useState(0);
   const [auditCount, setAuditCount] = useState(0);
+  const canManage = CAN_MANAGE.includes(profile?.role);
+  const canDeleteAudit = CAN_DELETE_AUDIT.includes(profile?.role);
 
   useEffect(() => {
     supabase.from("locations").select("id", { count: "exact", head: true }).then(({ count }) => setLocCount(count || 0));
@@ -873,21 +892,22 @@ export default function Dashboard({ session, onStartAudit, onResumeAudit }) {
         <div style={s.logo}><i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 11, color: "#888" }}>{session.user.email}</span>
+          {profile?.role && <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C" }}>{ROLE_LABEL[profile.role] || profile.role}</span>}
           <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }}>Uitloggen</button>
         </div>
       </div>
       <nav style={s.nav}>
-        {NAV.map((item) => (
+        {navForRole(profile?.role).map((item) => (
           <button key={item.id} style={s.navBtn(page === item.id)} onClick={() => setPage(item.id)}>
             <i className={`ti ${item.icon}`} style={{ fontSize: 16 }} />{item.label}
           </button>
         ))}
       </nav>
       {page === "home"       && <Home onNav={setPage} locCount={locCount} tplCount={tplCount} auditCount={auditCount} onNewAudit={onStartAudit} />}
-      {page === "locations"  && <Locations />}
-      {page === "answersets" && <AnswerSets />}
-      {page === "templates"  && <Templates />}
-      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} />}
+      {page === "locations"  && <Locations profile={profile} canManage={canManage} />}
+      {page === "answersets" && <AnswerSets profile={profile} canManage={canManage} />}
+      {page === "templates"  && <Templates profile={profile} canManage={canManage} />}
+      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} />}
     </div>
   );
 }
