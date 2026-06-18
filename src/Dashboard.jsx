@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
+import { exportAuditToPdf } from "./lib/exportPdf";
 
 const NAV = [
   { id: "home",       label: "Dashboard",   icon: "ti-home" },
@@ -799,9 +800,11 @@ function Templates({ profile, canManage }) {
 }
 
 // ── Audits ───────────────────────────────────────────────
-function Audits({ onNewAudit, onResumeAudit, canDelete }) {
+function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
+  const [exportingId, setExportingId] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -810,6 +813,17 @@ function Audits({ onNewAudit, onResumeAudit, canDelete }) {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  async function handleExport(id) {
+    if (exportingId) return;
+    setExportingId(id);
+    try {
+      await exportAuditToPdf(id);
+    } catch (e) {
+      alert("Kon de PDF niet genereren: " + e.message);
+    }
+    setExportingId(null);
+  }
 
   async function remove(id) {
     if (!confirm("Deze audit en alle bijbehorende antwoorden permanent verwijderen?")) return;
@@ -820,22 +834,33 @@ function Audits({ onNewAudit, onResumeAudit, canDelete }) {
     await load();
   }
 
+  async function toggleArchive(id, archived) {
+    await supabase.from("audits").update({ archived }).eq("id", id);
+    await load();
+  }
+
   const statusColor = { draft: "#EF9F27", submitted: "#1D9E75" };
   const statusLabel = { draft: "Concept", submitted: "Ingediend" };
+  const visibleAudits = audits.filter((a) => !!a.archived === showArchived);
 
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
-        <span>Audits ({audits.length})</span>
-        <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> Nieuwe audit</button>
+        <span>Audits ({visibleAudits.length})</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={s.btn(false)} onClick={() => setShowArchived((v) => !v)}>
+            <i className={`ti ${showArchived ? "ti-clipboard-check" : "ti-archive"}`} /> {showArchived ? "Actieve audits" : "Gearchiveerd"}
+          </button>
+          <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> Nieuwe audit</button>
+        </div>
       </div>
       {loading ? <div style={s.empty}>Laden...</div>
-        : audits.length === 0 ? <div style={s.empty}><i className="ti ti-clipboard-list" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Nog geen audits.</div>
-        : audits.map((audit) => (
+        : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "Geen gearchiveerde audits." : "Nog geen audits."}</div>
+        : visibleAudits.map((audit) => (
           <div
             key={audit.id}
-            style={{ ...s.card, cursor: audit.status === "draft" ? "pointer" : "default" }}
-            onClick={() => { if (audit.status === "draft" && onResumeAudit) onResumeAudit(audit); }}
+            style={{ ...s.card, cursor: !showArchived && audit.status === "draft" ? "pointer" : "default" }}
+            onClick={() => { if (!showArchived && audit.status === "draft" && onResumeAudit) onResumeAudit(audit); }}
           >
             <div style={s.row}>
               <div>
@@ -850,9 +875,17 @@ function Audits({ onNewAudit, onResumeAudit, canDelete }) {
                   {audit.score_pct !== null && <span style={s.badge("#378ADD")}>{audit.score_pct}%</span>}
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {canDelete && <button onClick={(e) => { e.stopPropagation(); remove(audit.id); }} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
-                {audit.status === "draft" && <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => handleExport(audit.id)} disabled={exportingId === audit.id} style={{ fontSize: 12, color: "#378ADD", border: "none", background: "none", cursor: exportingId === audit.id ? "not-allowed" : "pointer" }} title="Exporteer als PDF">
+                  <i className={`ti ${exportingId === audit.id ? "ti-loader-2" : "ti-file-type-pdf"}`} />
+                </button>
+                {canArchive && (
+                  <button onClick={() => toggleArchive(audit.id, !audit.archived)} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }} title={audit.archived ? "Terugzetten" : "Archiveren"}>
+                    <i className={`ti ${audit.archived ? "ti-archive-off" : "ti-archive"}`} />
+                  </button>
+                )}
+                {canDelete && <button onClick={() => remove(audit.id)} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
+                {!showArchived && audit.status === "draft" && <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />}
               </div>
             </div>
           </div>
@@ -865,6 +898,7 @@ function Audits({ onNewAudit, onResumeAudit, canDelete }) {
 const ROLE_LABEL = { admin: "Admin", manager: "Manager", auditor: "Auditor", viewer: "Viewer" };
 const CAN_MANAGE = ["admin", "manager"]; // who can create/edit/delete locations, templates, answer sets
 const CAN_DELETE_AUDIT = ["admin"];
+const CAN_ARCHIVE_AUDIT = ["admin", "manager"];
 
 function navForRole(role) {
   let nav = NAV;
@@ -1033,6 +1067,7 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
   const [auditCount, setAuditCount] = useState(0);
   const canManage = CAN_MANAGE.includes(profile?.role);
   const canDeleteAudit = CAN_DELETE_AUDIT.includes(profile?.role);
+  const canArchiveAudit = CAN_ARCHIVE_AUDIT.includes(profile?.role);
 
   useEffect(() => {
     supabase.from("locations").select("id", { count: "exact", head: true }).then(({ count }) => setLocCount(count || 0));
@@ -1063,7 +1098,7 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
       {page === "locations"  && <Locations profile={profile} canManage={canManage} />}
       {page === "answersets" && <AnswerSets profile={profile} canManage={canManage} />}
       {page === "templates"  && <Templates profile={profile} canManage={canManage} />}
-      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} />}
+      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} canArchive={canArchiveAudit} />}
       {page === "users"      && <Users profile={profile} session={session} />}
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
+import { exportAuditToPdf } from "./lib/exportPdf";
 
 function pctColor(pct) {
   if (pct < 20) return "#A32D2D";
@@ -232,6 +233,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   const [locData, setLocData] = useState({ name: location?.name||"", street: "", city: "", detail: "" });
   const [editDraft, setEditDraft] = useState({ ...locData });
   const [submitting, setSubmitting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const saveTimers = useRef({});
 
   useEffect(() => {
@@ -326,6 +328,17 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
     }).eq("id", auditId);
   }
 
+  async function handleExportPdf() {
+    if (exportingPdf || !auditId) return;
+    setExportingPdf(true);
+    try {
+      await exportAuditToPdf(auditId);
+    } catch (e) {
+      alert("Kon de PDF niet genereren: " + e.message);
+    }
+    setExportingPdf(false);
+  }
+
   async function handleSubmit() {
     if (submitting) return;
     setSubmitting(true);
@@ -398,7 +411,12 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
           <button onClick={onBack} style={{ fontSize:13,color:"#1D9E75",border:"none",background:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4 }}>
             <i className="ti ti-arrow-left" /> Dashboard
           </button>
-          <div style={{ fontSize:11,color:"#888" }}>{session.user.email}</div>
+          <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+            <button onClick={handleExportPdf} disabled={exportingPdf} style={{ fontSize:12,color:"#378ADD",border:"0.5px solid #378ADD",borderRadius:6,padding:"4px 9px",background:"none",cursor:exportingPdf?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
+              <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Genereren..." : "PDF"}
+            </button>
+            <div style={{ fontSize:11,color:"#888" }}>{session.user.email}</div>
+          </div>
         </div>
         <div style={{ fontSize:15,fontWeight:600 }}>{template?.name}</div>
         <div style={{ fontSize:12,color:"#888",marginTop:1 }}>{locData.name}</div>
