@@ -7,6 +7,7 @@ const NAV = [
   { id: "answersets", label: "Antwoordsets", icon: "ti-list-check" },
   { id: "templates",  label: "Templates",   icon: "ti-file-description" },
   { id: "audits",     label: "Audits",      icon: "ti-clipboard-check" },
+  { id: "users",      label: "Gebruikers",  icon: "ti-users" },
 ];
 
 const ANSWER_TYPES = [
@@ -866,8 +867,163 @@ const CAN_MANAGE = ["admin", "manager"]; // who can create/edit/delete locations
 const CAN_DELETE_AUDIT = ["admin"];
 
 function navForRole(role) {
-  if (role === "viewer") return NAV.filter((n) => n.id !== "answersets"); // viewers don't manage config
-  return NAV;
+  let nav = NAV;
+  if (role === "viewer") nav = nav.filter((n) => n.id !== "answersets"); // viewers don't manage config
+  if (role !== "admin") nav = nav.filter((n) => n.id !== "users"); // only admins manage users
+  return nav;
+}
+
+// ── Users ────────────────────────────────────────────────
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "manager", label: "Manager" },
+  { value: "auditor", label: "Auditor" },
+  { value: "viewer", label: "Viewer" },
+];
+
+function Users({ profile, session }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "", fullName: "", role: "auditor" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/list-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: profile.organization_id, requesterId: session.user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      setUsers(data.users || []);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function save() {
+    if (!form.email.trim() || !form.password.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/invite-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email, password: form.password, fullName: form.fullName, role: form.role,
+          organizationId: profile.organization_id, requesterId: session.user.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      setForm({ email: "", password: "", fullName: "", role: "auditor" });
+      setShowForm(false);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+    setSaving(false);
+  }
+
+  async function updateRole(userId, newRole) {
+    setError(null);
+    try {
+      const res = await fetch("/api/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateRole", targetUserId: userId, newRole, organizationId: profile.organization_id, requesterId: session.user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function removeUser(userId) {
+    if (!confirm("Deze gebruiker permanent verwijderen?")) return;
+    setError(null);
+    try {
+      const res = await fetch("/api/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", targetUserId: userId, organizationId: profile.organization_id, requesterId: session.user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  return (
+    <div style={s.page}>
+      <div style={s.sTitle}>
+        <span>Gebruikers ({users.length})</span>
+        <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
+          <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ fontSize: 12, color: "#A32D2D", background: "#FCEBEB", border: "1px solid #E24B4A", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+
+      {showForm && (
+        <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>Nieuwe gebruiker</div>
+          <div style={s.label}>E-mailadres *</div>
+          <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={s.input} placeholder="naam@bedrijf.nl" />
+          <div style={{ ...s.label, marginTop: 8 }}>Volledige naam</div>
+          <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} style={s.input} placeholder="Optioneel" />
+          <div style={{ ...s.label, marginTop: 8 }}>Tijdelijk wachtwoord *</div>
+          <input type="text" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} style={s.input} placeholder="Minimaal 6 tekens" />
+          <div style={{ ...s.label, marginTop: 8 }}>Rol</div>
+          <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} style={s.select}>
+            {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+            <button style={s.btn(true)} onClick={save} disabled={!form.email.trim() || !form.password.trim() || saving}>
+              <i className="ti ti-check" /> {saving ? "Aanmaken..." : "Aanmaken"}
+            </button>
+            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Annuleren</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? <div style={s.empty}>Laden...</div>
+        : users.length === 0 ? <div style={s.empty}><i className="ti ti-users" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Nog geen gebruikers.</div>
+        : users.map((u) => (
+          <div key={u.id} style={s.card}>
+            <div style={s.row}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || u.email || "Onbekend"}</div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{u.email}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === session.user.id} style={{ fontSize: 12, border: "1px solid #ddd", borderRadius: 6, padding: "4px 8px", background: "white" }}>
+                  {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+                {u.id !== session.user.id && (
+                  <button onClick={() => removeUser(u.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+    </div>
+  );
 }
 
 export default function Dashboard({ session, profile, onStartAudit, onResumeAudit }) {
@@ -908,6 +1064,7 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
       {page === "answersets" && <AnswerSets profile={profile} canManage={canManage} />}
       {page === "templates"  && <Templates profile={profile} canManage={canManage} />}
       {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} />}
+      {page === "users"      && <Users profile={profile} session={session} />}
     </div>
   );
 }
