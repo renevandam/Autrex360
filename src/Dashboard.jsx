@@ -1202,6 +1202,11 @@ function Users({ profile, session }) {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || u.email || "Onbekend"}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{u.email}</div>
+                <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>
+                  <i className="ti ti-clock" style={{ fontSize: 11 }} /> Laatste login: {u.last_sign_in_at
+                    ? new Date(u.last_sign_in_at).toLocaleString("nl-NL", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                    : "Nog niet ingelogd"}
+                </div>
                 {u.must_change_password && (
                   <span style={{ fontSize: 10, fontWeight: 500, display: "inline-block", marginTop: 4, padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806" }}>
                     <i className="ti ti-clock" style={{ fontSize: 10 }} /> Uitnodiging nog niet geactiveerd

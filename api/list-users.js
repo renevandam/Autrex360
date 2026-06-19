@@ -38,11 +38,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: profilesError.message });
   }
 
-  // Fetch emails from auth.users for each profile id
+  // Fetch emails and last sign-in time from auth.users for each profile id
   const usersWithEmail = await Promise.all(
     (profiles || []).map(async (p) => {
       const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(p.id);
-      return { ...p, email: authUser?.user?.email || null };
+      return { ...p, email: authUser?.user?.email || null, last_sign_in_at: authUser?.user?.last_sign_in_at || null };
     })
   );
 
