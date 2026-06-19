@@ -80,6 +80,7 @@ function Locations({ profile, canManage }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", street: "", postal_code: "", city: "", country: "NL", location_detail: "", contact_name: "", contact_email: "" });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -103,15 +104,30 @@ function Locations({ profile, canManage }) {
     await load();
   }
 
+  const visibleLocations = locations.filter((l) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return l.name?.toLowerCase().includes(q) || l.city?.toLowerCase().includes(q);
+  });
+
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
-        <span>Locaties ({locations.length})</span>
+        <span>Locaties ({visibleLocations.length})</span>
         {canManage && (
           <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
             <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
           </button>
         )}
+      </div>
+      <div style={{ marginBottom: 14, position: "relative" }}>
+        <i className="ti ti-search" style={{ position: "absolute", left: 11, top: 10, fontSize: 14, color: "#aaa" }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ ...s.input, paddingLeft: 32 }}
+          placeholder="Zoek op naam of stad..."
+        />
       </div>
       {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
@@ -131,8 +147,8 @@ function Locations({ profile, canManage }) {
         </div>
       )}
       {loading ? <div style={s.empty}>Laden...</div>
-        : locations.length === 0 ? <div style={s.empty}><i className="ti ti-building-warehouse" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Nog geen locaties.</div>
-        : locations.map((loc) => (
+        : visibleLocations.length === 0 ? <div style={s.empty}><i className="ti ti-building-warehouse" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "Geen locaties gevonden voor deze zoekterm." : "Nog geen locaties."}</div>
+        : visibleLocations.map((loc) => (
           <div key={loc.id} style={s.card}>
             <div style={s.row}>
               <div>
