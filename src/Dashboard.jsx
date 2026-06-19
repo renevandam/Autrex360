@@ -950,6 +950,54 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
 }
 
 // ── Dashboard main ────────────────────────────────────────
+// ── Change password modal ───────────────────────────────────
+function ChangePasswordModal({ onClose }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+
+  async function save() {
+    setError(null);
+    if (password.length < 6) { setError("Wachtwoord moet minimaal 6 tekens zijn."); return; }
+    if (password !== confirm) { setError("Wachtwoorden komen niet overeen."); return; }
+    setSaving(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setSaving(false);
+    if (updateError) { setError(updateError.message); return; }
+    setSuccess(true);
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+      <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 380 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 12 }}>Wachtwoord wijzigen</div>
+        {success ? (
+          <>
+            <div style={{ fontSize: 13, color: "#1D9E75", marginBottom: 16 }}><i className="ti ti-circle-check" /> Wachtwoord succesvol gewijzigd.</div>
+            <button style={s.btn(true)} onClick={onClose}>Sluiten</button>
+          </>
+        ) : (
+          <>
+            <div style={s.label}>Nieuw wachtwoord</div>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={s.input} placeholder="Minimaal 6 tekens" autoFocus />
+            <div style={{ ...s.label, marginTop: 10 }}>Bevestig nieuw wachtwoord</div>
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} style={s.input} placeholder="Herhaal wachtwoord" />
+            {error && <div style={{ fontSize: 12, color: "#E24B4A", marginTop: 8 }}>{error}</div>}
+            <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+              <button style={s.btn(true)} onClick={save} disabled={saving || !password || !confirm}>
+                <i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}
+              </button>
+              <button style={s.btn(false)} onClick={onClose}>Annuleren</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const ROLE_LABEL = { admin: "Admin", manager: "Manager", auditor: "Auditor", viewer: "Viewer" };
 const CAN_MANAGE = ["admin", "manager"]; // who can create/edit/delete locations, templates, answer sets
 const CAN_DELETE_AUDIT = ["admin"];
@@ -1123,6 +1171,7 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
   const canManage = CAN_MANAGE.includes(profile?.role);
   const canDeleteAudit = CAN_DELETE_AUDIT.includes(profile?.role);
   const canArchiveAudit = CAN_ARCHIVE_AUDIT.includes(profile?.role);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
     supabase.from("locations").select("id", { count: "exact", head: true }).then(({ count }) => setLocCount(count || 0));
@@ -1139,9 +1188,13 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 11, color: "#888" }}>{session.user.email}</span>
           {profile?.role && <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C" }}>{ROLE_LABEL[profile.role] || profile.role}</span>}
+          <button onClick={() => setShowPasswordModal(true)} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }} title="Wachtwoord wijzigen">
+            <i className="ti ti-key" />
+          </button>
           <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }}>Uitloggen</button>
         </div>
       </div>
+      {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
       <nav style={s.nav}>
         {navForRole(profile?.role).map((item) => (
           <button key={item.id} style={s.navBtn(page === item.id)} onClick={() => setPage(item.id)}>

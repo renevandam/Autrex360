@@ -5,11 +5,16 @@ import Dashboard from "./Dashboard.jsx";
 import AuditStart from "./AuditStart.jsx";
 import AuditRun from "./AuditRun.jsx";
 import PublicAudit from "./PublicAudit.jsx";
+import ResetPassword from "./ResetPassword.jsx";
 
 // Detect /audit/:token in the URL path — works without any router library
 function getAuditToken() {
   const match = window.location.pathname.match(/^\/audit\/([a-f0-9]{64})$/i);
   return match ? match[1] : null;
+}
+
+function isResetPasswordRoute() {
+  return window.location.pathname === "/reset-password";
 }
 
 export default function App() {
@@ -22,6 +27,9 @@ export default function App() {
   // If the URL is a public audit link, skip auth entirely
   const publicToken = getAuditToken();
   if (publicToken) return <PublicAudit token={publicToken} />;
+
+  // Password reset link from email - also skips normal auth flow
+  if (isResetPasswordRoute()) return <ResetPassword />;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
