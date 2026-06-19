@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from('user_profiles')
-    .select('id, role, full_name, created_at')
+    .select('id, role, full_name, created_at, must_change_password')
     .eq('organization_id', organizationId)
     .order('created_at');
 

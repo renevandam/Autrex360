@@ -1034,7 +1034,7 @@ function Users({ profile, session }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "", fullName: "", role: "auditor" });
+  const [form, setForm] = useState({ email: "", fullName: "", role: "auditor" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -1058,7 +1058,7 @@ function Users({ profile, session }) {
   useEffect(() => { load(); }, []);
 
   async function save() {
-    if (!form.email.trim() || !form.password.trim()) return;
+    if (!form.email.trim()) return;
     setSaving(true);
     setError(null);
     try {
@@ -1066,13 +1066,13 @@ function Users({ profile, session }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: form.email, password: form.password, fullName: form.fullName, role: form.role,
+          email: form.email, fullName: form.fullName, role: form.role,
           organizationId: profile.organization_id, requesterId: session.user.id,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Onbekende fout");
-      setForm({ email: "", password: "", fullName: "", role: "auditor" });
+      setForm({ email: "", fullName: "", role: "auditor" });
       setShowForm(false);
       await load();
     } catch (e) {
@@ -1132,19 +1132,18 @@ function Users({ profile, session }) {
       {showForm && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>Nieuwe gebruiker</div>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>De gebruiker ontvangt een e-mail met een beveiligde link om zelf een wachtwoord in te stellen.</div>
           <div style={s.label}>E-mailadres *</div>
           <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={s.input} placeholder="naam@bedrijf.nl" />
           <div style={{ ...s.label, marginTop: 8 }}>Volledige naam</div>
           <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} style={s.input} placeholder="Optioneel" />
-          <div style={{ ...s.label, marginTop: 8 }}>Tijdelijk wachtwoord *</div>
-          <input type="text" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} style={s.input} placeholder="Minimaal 6 tekens" />
           <div style={{ ...s.label, marginTop: 8 }}>Rol</div>
           <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} style={s.select}>
             {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-            <button style={s.btn(true)} onClick={save} disabled={!form.email.trim() || !form.password.trim() || saving}>
-              <i className="ti ti-check" /> {saving ? "Aanmaken..." : "Aanmaken"}
+            <button style={s.btn(true)} onClick={save} disabled={!form.email.trim() || saving}>
+              <i className="ti ti-mail" /> {saving ? "Versturen..." : "Uitnodiging versturen"}
             </button>
             <button style={s.btn(false)} onClick={() => setShowForm(false)}>Annuleren</button>
           </div>
@@ -1159,6 +1158,11 @@ function Users({ profile, session }) {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || u.email || "Onbekend"}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{u.email}</div>
+                {u.must_change_password && (
+                  <span style={{ fontSize: 10, fontWeight: 500, display: "inline-block", marginTop: 4, padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806" }}>
+                    <i className="ti ti-clock" style={{ fontSize: 10 }} /> Uitnodiging nog niet geactiveerd
+                  </span>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === session.user.id} style={{ fontSize: 12, border: "1px solid #ddd", borderRadius: 6, padding: "4px 8px", background: "white" }}>

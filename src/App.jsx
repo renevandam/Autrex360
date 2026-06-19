@@ -41,7 +41,7 @@ export default function App() {
     async function loadProfile() {
       if (!session) { setProfile(null); setProfileLoading(false); return; }
       setProfileLoading(true);
-      const { data } = await supabase.from("user_profiles").select("organization_id, role, full_name").eq("id", session.user.id).single();
+      const { data } = await supabase.from("user_profiles").select("organization_id, role, full_name, must_change_password").eq("id", session.user.id).single();
       setProfile(data || null);
       setProfileLoading(false);
     }
@@ -55,6 +55,10 @@ export default function App() {
       <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Laden...
     </div>
   );
+
+  // Force a fresh password to be set before anything else, even if the
+  // user somehow ended up logged in without going through the reset link.
+  if (profile?.must_change_password) return <ResetPassword forced />;
 
   if (!profile) return (
     <div style={{ fontFamily: "system-ui,sans-serif", maxWidth: 480, margin: "4rem auto", textAlign: "center", padding: "0 1.5rem" }}>
