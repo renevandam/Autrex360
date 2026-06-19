@@ -4,6 +4,7 @@ import AuthPage from "./Auth.jsx";
 import Dashboard from "./Dashboard.jsx";
 import AuditStart from "./AuditStart.jsx";
 import AuditRun from "./AuditRun.jsx";
+import AuditReport from "./AuditReport.jsx";
 import PublicAudit from "./PublicAudit.jsx";
 import ResetPassword from "./ResetPassword.jsx";
 
@@ -23,6 +24,7 @@ export default function App() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [screen, setScreen] = useState("dashboard");
   const [auditParams, setAuditParams] = useState(null);
+  const [reportAuditId, setReportAuditId] = useState(null);
 
   // If the URL is a public audit link, skip auth entirely
   const publicToken = getAuditToken();
@@ -83,6 +85,14 @@ export default function App() {
         });
         setScreen("run");
       }}
+      onViewReport={(auditId) => { setReportAuditId(auditId); setScreen("report"); }}
+    />
+  );
+
+  if (screen === "report" && reportAuditId) return (
+    <AuditReport
+      auditId={reportAuditId}
+      onBack={() => { setReportAuditId(null); setScreen("dashboard"); }}
     />
   );
 

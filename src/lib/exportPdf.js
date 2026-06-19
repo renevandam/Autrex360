@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import { supabase } from "./supabase";
+import { loadAuditReportData, answerLabel, isActionItem, STATUS_LABEL } from "./auditReportData";
 
 const BRAND_BLUE = [11, 110, 193];   // #0B6EC1
 const BRAND_DARK = [9, 50, 90];      // #09325A
@@ -7,76 +7,6 @@ const GREEN = [29, 158, 117];        // #1D9E75
 const ORANGE = [239, 159, 39];       // #EF9F27
 const RED = [226, 75, 74];           // #E24B4A
 const GREY = [136, 136, 136];
-
-const STATUS_LABEL = { draft: "Concept", submitted: "Ingediend" };
-
-// Fetch everything needed to render a full audit report
-async function loadAuditReportData(auditId) {
-  const { data: audit } = await supabase
-    .from("audits")
-    .select("*, locations(*), audit_templates(id,name,description)")
-    .eq("id", auditId)
-    .single();
-  if (!audit) throw new Error("Audit niet gevonden");
-
-  const { data: sections } = await supabase
-    .from("template_sections")
-    .select("*")
-    .eq("template_id", audit.template_id)
-    .order("sort_order");
-
-  const sectionIds = (sections || []).map((s) => s.id);
-  const { data: items } = sectionIds.length
-    ? await supabase.from("template_items").select("*, answer_sets(name)").in("section_id", sectionIds).order("sort_order")
-    : { data: [] };
-
-  const itemIds = (items || []).map((i) => i.id);
-  const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
-
-  const [{ data: options }, { data: responses }, { data: stockRows }] = await Promise.all([
-    setIds.length ? supabase.from("answer_options").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
-    itemIds.length ? supabase.from("audit_responses").select("*").in("item_id", itemIds).eq("audit_id", auditId) : Promise.resolve({ data: [] }),
-    itemIds.length ? supabase.from("stock_checks").select("*").in("item_id", itemIds).eq("audit_id", auditId).order("row_order") : Promise.resolve({ data: [] }),
-  ]);
-
-  const optionsBySet = {};
-  (options || []).forEach((o) => { optionsBySet[o.set_id] = optionsBySet[o.set_id] || []; optionsBySet[o.set_id].push(o); });
-  const responseByItem = {};
-  (responses || []).forEach((r) => { responseByItem[r.item_id] = r.response; });
-  const stockByItem = {};
-  (stockRows || []).forEach((r) => { stockByItem[r.item_id] = stockByItem[r.item_id] || []; stockByItem[r.item_id].push(r); });
-
-  const itemsBySection = {};
-  (items || []).forEach((it) => { itemsBySection[it.section_id] = itemsBySection[it.section_id] || []; itemsBySection[it.section_id].push(it); });
-
-  return {
-    audit,
-    sections: (sections || []).map((sec) => ({ ...sec, items: itemsBySection[sec.id] || [] })),
-    optionsBySet,
-    responseByItem,
-    stockByItem,
-  };
-}
-
-function answerLabel(item, optionsBySet, responseByItem) {
-  const raw = responseByItem[item.id];
-  if (raw === undefined || raw === null || raw === "") return "— Niet ingevuld —";
-  if (item.answer_type === "score" && item.answer_set_id) {
-    const opts = optionsBySet[item.answer_set_id] || [];
-    const match = opts.find((o) => o.id === raw);
-    return match ? match.label : raw;
-  }
-  if (item.answer_type === "checkbox") return raw === "true" ? "Ja" : "Nee";
-  if (item.answer_type === "slider") return `${raw}%`;
-  return String(raw);
-}
-
-function isActionItem(item, optionsBySet, responseByItem) {
-  if (item.answer_type !== "score" || !item.answer_set_id) return false;
-  const opts = optionsBySet[item.answer_set_id] || [];
-  const match = opts.find((o) => o.id === responseByItem[item.id]);
-  return !!match?.is_action_item;
-}
 
 export async function exportAuditToPdf(auditId) {
   const { audit, sections, optionsBySet, responseByItem, stockByItem } = await loadAuditReportData(auditId);

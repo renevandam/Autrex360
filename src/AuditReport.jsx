@@ -1,0 +1,181 @@
+import { useState, useEffect } from "react";
+import { loadAuditReportData, answerLabel, isActionItem, answerColor, STATUS_LABEL } from "./lib/auditReportData";
+import { exportAuditToPdf } from "./lib/exportPdf";
+
+export default function AuditReport({ auditId, onBack }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const result = await loadAuditReportData(auditId);
+        setData(result);
+      } catch (e) {
+        setError(e.message);
+      }
+      setLoading(false);
+    }
+    load();
+  }, [auditId]);
+
+  async function handleExportPdf() {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      await exportAuditToPdf(auditId);
+    } catch (e) {
+      alert("Kon de PDF niet genereren: " + e.message);
+    }
+    setExportingPdf(false);
+  }
+
+  const s = {
+    wrap: { fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" },
+    header: { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between" },
+    page: { padding: "1.25rem" },
+    sec: { padding: "0 1.25rem", marginTop: 18 },
+    secTitle: { fontSize: 13, fontWeight: 700, color: "#378ADD", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 },
+    card: { background: "#f9f9f9", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "0.75rem 1rem" },
+  };
+
+  if (loading) return (
+    <div style={{ ...s.wrap, textAlign: "center", padding: "3rem", color: "#aaa" }}>
+      <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Rapport laden...
+    </div>
+  );
+
+  if (error || !data) return (
+    <div style={{ ...s.wrap, textAlign: "center", padding: "3rem" }}>
+      <i className="ti ti-alert-circle" style={{ fontSize: 36, color: "#E24B4A", display: "block", marginBottom: 10 }} />
+      <div style={{ fontSize: 14, fontWeight: 600 }}>Kon het rapport niet laden</div>
+      <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>{error}</div>
+      <button onClick={onBack} style={{ marginTop: 16, padding: "8px 16px", background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Terug</button>
+    </div>
+  );
+
+  const { audit, sections, optionsBySet, responseByItem, stockByItem } = data;
+
+  const actionItems = [];
+  sections.forEach((sec) => sec.items.forEach((item) => {
+    if (isActionItem(item, optionsBySet, responseByItem)) actionItems.push({ section: sec.name, item });
+  }));
+
+  const scoreColor = audit.score_pct >= 80 ? "#1D9E75" : audit.score_pct >= 50 ? "#EF9F27" : "#E24B4A";
+
+  return (
+    <div style={s.wrap}>
+      <div style={s.header}>
+        <button onClick={onBack} style={{ fontSize: 13, color: "#1D9E75", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+          <i className="ti ti-arrow-left" /> Terug
+        </button>
+        <button onClick={handleExportPdf} disabled={exportingPdf} style={{ fontSize: 12, color: "#378ADD", border: "0.5px solid #378ADD", borderRadius: 6, padding: "5px 10px", background: "none", cursor: exportingPdf ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+          <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Genereren..." : "Download PDF"}
+        </button>
+      </div>
+
+      <div style={s.page}>
+        <div style={{ fontSize: 19, fontWeight: 700, color: "#09325A" }}>
+          {audit.audit_templates?.name || "Audit"}
+          {audit.locations?.name && <span style={{ color: "#aaa", fontWeight: 400 }}> – {audit.locations.name}</span>}
+        </div>
+        <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>
+          <i className="ti ti-calendar" style={{ fontSize: 13 }} /> {new Date(audit.audit_date).toLocaleDateString("nl-NL")}
+          {audit.auditor_name && <> · {audit.auditor_name}</>}
+          {" · "}
+          <span style={{ fontWeight: 500, color: audit.status === "submitted" ? "#1D9E75" : "#EF9F27" }}>{STATUS_LABEL[audit.status] || audit.status}</span>
+        </div>
+
+        {/* Score */}
+        <div style={{ marginTop: 18 }}>
+          {audit.score_pct !== null && audit.score_pct !== undefined ? (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+              <div style={{ fontSize: 38, fontWeight: 700, color: scoreColor }}>{audit.score_pct}%</div>
+              <div style={{ fontSize: 13, color: "#888" }}>{audit.score_achieved ?? "?"} / {audit.score_max ?? "?"} punten</div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: "#888", fontStyle: "italic" }}>Score nog niet beschikbaar (audit is nog niet ingediend)</div>
+          )}
+        </div>
+
+        {/* Action items */}
+        <div style={{ marginTop: 18 }}>
+          {actionItems.length > 0 ? (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#E24B4A", marginBottom: 8 }}>
+                <i className="ti ti-alert-triangle" /> Actiepunten ({actionItems.length})
+              </div>
+              <div style={{ background: "#FCEBEB", border: "0.5px solid #E24B4A", borderRadius: 10, padding: "0.75rem 1rem" }}>
+                {actionItems.map(({ section, item }, idx) => (
+                  <div key={item.id} style={{ fontSize: 13, padding: "5px 0", borderTop: idx === 0 ? "none" : "0.5px solid #f3d6d6" }}>
+                    <span style={{ color: "#888" }}>[{section}]</span> {item.label} — <span style={{ fontWeight: 600, color: "#A32D2D" }}>{answerLabel(item, optionsBySet, responseByItem)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 13, color: "#1D9E75", fontStyle: "italic" }}><i className="ti ti-circle-check" /> Geen actiepunten gesignaleerd.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Detailed sections */}
+      {sections.map((section) => (
+        <div key={section.id} style={s.sec}>
+          <div style={s.secTitle}><i className="ti ti-list" /> {section.name}</div>
+          <div style={s.card}>
+            {section.items.length === 0 ? (
+              <div style={{ fontSize: 12, color: "#aaa", fontStyle: "italic" }}>Geen vragen in deze sectie.</div>
+            ) : section.items.filter((i) => i.answer_type !== "signature").map((item, idx) => {
+              const flagged = isActionItem(item, optionsBySet, responseByItem);
+              const color = answerColor(item, optionsBySet, responseByItem);
+              return (
+                <div key={item.id} style={{ padding: "8px 0", borderTop: idx === 0 ? "none" : "0.5px solid #eee" }}>
+                  {item.answer_type === "stock_take" ? (
+                    <>
+                      <div style={{ fontSize: 13 }}>{item.label}</div>
+                      <div style={{ marginTop: 6, overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr>
+                              {[item.stock_col1_label || "Kol1", item.stock_col2_label || "Kol2", item.stock_col3_label || "Kol3"].map((h) => (
+                                <th key={h} style={{ textAlign: "left", color: "#aaa", fontWeight: 500, padding: "3px 6px", borderBottom: "0.5px solid #ddd" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(stockByItem[item.id] || []).map((row) => (
+                              <tr key={row.id || row.row_order}>
+                                <td style={{ padding: "3px 6px" }}>{row.col1_value || "—"}</td>
+                                <td style={{ padding: "3px 6px" }}>{row.col2_value || "—"}</td>
+                                <td style={{ padding: "3px 6px" }}>{row.col3_value || "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 13 }}>{item.label}</div>
+                        {item.sub_label && <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>{item.sub_label}</div>}
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: flagged ? "#A32D2D" : (color || "#1D9E75"), whiteSpace: "nowrap" }}>
+                        {answerLabel(item, optionsBySet, responseByItem)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div style={{ height: 30 }} />
+    </div>
+  );
+}

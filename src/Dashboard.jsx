@@ -846,7 +846,7 @@ function Templates({ profile, canManage }) {
 }
 
 // ── Audits ───────────────────────────────────────────────
-function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
+function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport }) {
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -961,6 +961,9 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => onViewReport && onViewReport(audit.id)} style={{ fontSize: 12, color: "#1D9E75", border: "none", background: "none", cursor: "pointer" }} title="Bekijk rapport">
+                  <i className="ti ti-eye" />
+                </button>
                 <button onClick={() => { setLinkModal({ auditId: audit.id }); setLinkEmail(""); setGeneratedLink(null); }} style={{ fontSize: 12, color: "#888", border: "none", background: "none", cursor: "pointer" }} title="Genereer externe link">
                   <i className="ti ti-link" />
                 </button>
@@ -1250,7 +1253,7 @@ function Users({ profile, session }) {
   );
 }
 
-export default function Dashboard({ session, profile, onStartAudit, onResumeAudit }) {
+export default function Dashboard({ session, profile, onStartAudit, onResumeAudit, onViewReport }) {
   const [page, setPage] = useState("home");
   const [locCount, setLocCount] = useState(0);
   const [tplCount, setTplCount] = useState(0);
@@ -1293,7 +1296,7 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
       {page === "locations"  && <Locations profile={profile} canManage={canManage} />}
       {page === "answersets" && <AnswerSets profile={profile} canManage={canManage} />}
       {page === "templates"  && <Templates profile={profile} canManage={canManage} />}
-      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} canArchive={canArchiveAudit} />}
+      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} canArchive={canArchiveAudit} onViewReport={onViewReport} />}
       {page === "users"      && <Users profile={profile} session={session} />}
     </div>
   );
