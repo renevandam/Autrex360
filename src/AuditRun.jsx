@@ -65,7 +65,7 @@ function SignaturePad({ label }) {
 }
 
 // ── Stock take table ──────────────────────────────────────
-function StockTakeTable({ item, auditId, isOffline, snapshotStockRows }) {
+function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOnline }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const maxRows = item.stock_max_rows || 5;
@@ -124,6 +124,7 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows }) {
             .single()
             .then(({ data }) => {
               if (data) setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, id: data.id } : r));
+              if (onSavedOnline) onSavedOnline();
             });
         }
         return currentRows;
@@ -340,28 +341,44 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
     load();
   }, [locationId, templateId, auditId, isOffline]);
 
+  // Builds and stores a fresh local snapshot. Used both for the explicit
+  // "download" button and for silent background refreshes while online,
+  // so the offline copy never goes stale once it has been created once.
+  async function refreshSnapshot(currentResponses) {
+    if (!auditId) return;
+    const itemIds = sections.flatMap((s) => s.items.map((i) => i.id));
+    const { data: stockRows } = itemIds.length
+      ? await supabase.from("stock_checks").select("*").in("item_id", itemIds).eq("audit_id", auditId)
+      : { data: [] };
+    await saveAuditSnapshot(auditId, {
+      locData,
+      sections,
+      itemOptions,
+      responses: currentResponses,
+      stockRows: stockRows || [],
+      addrVerified,
+    });
+    setHasOfflineSnapshot(true);
+  }
+
   // Downloads everything needed to run this audit with zero network connectivity
   async function handleDownloadOffline() {
     if (downloadingOffline || !auditId) return;
     setDownloadingOffline(true);
     try {
-      const itemIds = sections.flatMap((s) => s.items.map((i) => i.id));
-      const { data: stockRows } = itemIds.length
-        ? await supabase.from("stock_checks").select("*").in("item_id", itemIds).eq("audit_id", auditId)
-        : { data: [] };
-      await saveAuditSnapshot(auditId, {
-        locData,
-        sections,
-        itemOptions,
-        responses,
-        stockRows: stockRows || [],
-        addrVerified,
-      });
-      setHasOfflineSnapshot(true);
+      await refreshSnapshot(responses);
     } catch (e) {
       alert("Downloaden voor offline gebruik is mislukt: " + e.message);
     }
     setDownloadingOffline(false);
+  }
+
+  // Keep the local snapshot in sync in the background, but only once the
+  // auditor has actually created one - we shouldn't force a download nobody asked for.
+  async function refreshSnapshotIfExists(currentResponses) {
+    if (!auditId || isOffline) return;
+    const existing = await getAuditSnapshot(auditId);
+    if (existing) await refreshSnapshot(currentResponses);
   }
 
   // Pushes every locally-queued change to Supabase. Auditor triggers this manually.
@@ -419,6 +436,11 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         { audit_id: auditId, item_id: id, response: responseText },
         { onConflict: "audit_id,item_id" }
       );
+      // Keep any existing offline snapshot fresh, so going offline later never loses this answer
+      clearTimeout(saveTimers.current.__snapshotRefresh);
+      saveTimers.current.__snapshotRefresh = setTimeout(() => {
+        setResponses((current) => { refreshSnapshotIfExists(current); return current; });
+      }, 800);
     }, 500);
   }
 
@@ -621,7 +643,12 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
                   </>
                 )}
                 {item.answer_type === "stock_take" ? (
-                  <StockTakeTable item={item} auditId={auditId} isOffline={isOffline} snapshotStockRows={snapshotStockRows} />
+                  <StockTakeTable item={item} auditId={auditId} isOffline={isOffline} snapshotStockRows={snapshotStockRows} onSavedOnline={() => {
+                    clearTimeout(saveTimers.current.__snapshotRefresh);
+                    saveTimers.current.__snapshotRefresh = setTimeout(() => {
+                      setResponses((current) => { refreshSnapshotIfExists(current); return current; });
+                    }, 800);
+                  }} />
                 ) : (
                   <AnswerInput
                     item={item}
