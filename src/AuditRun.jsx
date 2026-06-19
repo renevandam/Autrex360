@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { exportAuditToPdf } from "./lib/exportPdf";
+import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, countPending } from "./lib/offlineStore";
+import { syncAuditToServer } from "./lib/offlineSync";
 
 function pctColor(pct) {
   if (pct < 20) return "#A32D2D";
@@ -63,7 +65,7 @@ function SignaturePad({ label }) {
 }
 
 // ── Stock take table ──────────────────────────────────────
-function StockTakeTable({ item, auditId }) {
+function StockTakeTable({ item, auditId, isOffline, snapshotStockRows }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const maxRows = item.stock_max_rows || 5;
@@ -71,12 +73,19 @@ function StockTakeTable({ item, auditId }) {
   const col2 = item.stock_col2_label || "Binlocatie";
   const col3 = item.stock_col3_label || "Aantal";
   const saveTimers = useRef({});
-  const pendingValues = useRef({}); // rowIdx -> latest {field: value} not yet flushed to the db
+  const pendingValues = useRef({}); // rowIdx -> latest {field: value} not yet flushed
 
   useEffect(() => {
     async function load() {
       if (!auditId) { setLoading(false); return; }
-      const { data } = await supabase.from("stock_checks").select("*").eq("audit_id", auditId).eq("item_id", item.id).order("row_order");
+      let data;
+      if (isOffline) {
+        // Use whatever was bundled in the offline snapshot, no network call
+        data = (snapshotStockRows || []).filter((r) => r.item_id === item.id);
+      } else {
+        const res = await supabase.from("stock_checks").select("*").eq("audit_id", auditId).eq("item_id", item.id).order("row_order");
+        data = res.data;
+      }
       let loaded = (data || []).sort((a, b) => a.row_order - b.row_order);
       // Pad with empty rows up to maxRows so there's always something to fill in
       while (loaded.length < maxRows) {
@@ -86,7 +95,7 @@ function StockTakeTable({ item, auditId }) {
       setLoading(false);
     }
     load();
-  }, [auditId, item.id, maxRows]);
+  }, [auditId, item.id, maxRows, isOffline]);
 
   function updateCell(rowIdx, field, value) {
     setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, [field]: value } : r));
@@ -99,22 +108,24 @@ function StockTakeTable({ item, auditId }) {
       // Read current row state at flush time (not at keystroke time) to merge with whatever else changed
       setRows((currentRows) => {
         const row = { ...currentRows[rowIdx], ...pending };
-        const payload = {
-          audit_id: auditId,
-          item_id: item.id,
-          row_order: rowIdx,
+        const values = {
           col1_value: row.col1_value || null,
           col2_value: row.col2_value || null,
           col3_value: row.col3_value || null,
         };
-        // True upsert on the (audit_id, item_id, row_order) unique constraint - no more manual insert/update race
-        supabase.from("stock_checks")
-          .upsert(payload, { onConflict: "audit_id,item_id,row_order" })
-          .select()
-          .single()
-          .then(({ data }) => {
-            if (data) setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, id: data.id } : r));
-          });
+        if (isOffline) {
+          // No network at all - write to the local queue, synced later by the auditor
+          queueStockRow(auditId, item.id, rowIdx, values);
+        } else {
+          // True upsert on the (audit_id, item_id, row_order) unique constraint
+          supabase.from("stock_checks")
+            .upsert({ audit_id: auditId, item_id: item.id, row_order: rowIdx, ...values }, { onConflict: "audit_id,item_id,row_order" })
+            .select()
+            .single()
+            .then(({ data }) => {
+              if (data) setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, id: data.id } : r));
+            });
+        }
         return currentRows;
       });
     }, 500);
@@ -234,10 +245,54 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   const [editDraft, setEditDraft] = useState({ ...locData });
   const [submitting, setSubmitting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [snapshotStockRows, setSnapshotStockRows] = useState([]);
+  const [hasOfflineSnapshot, setHasOfflineSnapshot] = useState(false);
+  const [downloadingOffline, setDownloadingOffline] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
   const saveTimers = useRef({});
+
+  // Track browser online/offline state so the UI can react immediately
+  useEffect(() => {
+    function goOnline() { setIsOffline(false); }
+    function goOffline() { setIsOffline(true); }
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+  }, []);
+
+  // Refresh the count of locally-queued, not-yet-synced changes
+  async function refreshPendingCount() {
+    if (!auditId) return;
+    const count = await countPending(auditId);
+    setPendingCount(count);
+  }
 
   useEffect(() => {
     async function load() {
+      // If we have no network at all, go straight to whatever was downloaded earlier
+      if (isOffline && auditId) {
+        const snapshot = await getAuditSnapshot(auditId);
+        if (snapshot) {
+          setLocData(snapshot.locData);
+          setEditDraft(snapshot.locData);
+          setSections(snapshot.sections);
+          setItemOptions(snapshot.itemOptions);
+          setSnapshotStockRows(snapshot.stockRows || []);
+          setResponses(snapshot.responses || {});
+          setAddrVerified(!!snapshot.addrVerified);
+          setHasOfflineSnapshot(true);
+          await refreshPendingCount();
+          setLoading(false);
+          return;
+        }
+        // No snapshot available and no network - nothing we can do
+        setLoading(false);
+        return;
+      }
+
       const { data: loc } = await supabase.from("locations").select("*").eq("id", locationId).single();
       if (loc) {
         const d = { name: loc.name, street: loc.street||"", city: `${loc.postal_code||""} ${loc.city||""}`.trim(), detail: loc.location_detail||"" };
@@ -276,11 +331,53 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
             setAddrChanged(true);
           }
         }
+        const existingSnapshot = await getAuditSnapshot(auditId);
+        setHasOfflineSnapshot(!!existingSnapshot);
+        await refreshPendingCount();
       }
       setLoading(false);
     }
     load();
-  }, [locationId, templateId, auditId]);
+  }, [locationId, templateId, auditId, isOffline]);
+
+  // Downloads everything needed to run this audit with zero network connectivity
+  async function handleDownloadOffline() {
+    if (downloadingOffline || !auditId) return;
+    setDownloadingOffline(true);
+    try {
+      const itemIds = sections.flatMap((s) => s.items.map((i) => i.id));
+      const { data: stockRows } = itemIds.length
+        ? await supabase.from("stock_checks").select("*").in("item_id", itemIds).eq("audit_id", auditId)
+        : { data: [] };
+      await saveAuditSnapshot(auditId, {
+        locData,
+        sections,
+        itemOptions,
+        responses,
+        stockRows: stockRows || [],
+        addrVerified,
+      });
+      setHasOfflineSnapshot(true);
+    } catch (e) {
+      alert("Downloaden voor offline gebruik is mislukt: " + e.message);
+    }
+    setDownloadingOffline(false);
+  }
+
+  // Pushes every locally-queued change to Supabase. Auditor triggers this manually.
+  async function handleSync() {
+    if (syncing || !auditId) return;
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await syncAuditToServer(auditId);
+      setSyncResult(result);
+      await refreshPendingCount();
+    } catch (e) {
+      setSyncResult({ synced: 0, failed: 0, error: e.message });
+    }
+    setSyncing(false);
+  }
 
   const rawItems = sections.flatMap((s) => s.items);
 
@@ -309,10 +406,15 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   function setResponse(id, val) {
     setResponses((p) => ({ ...p, [id]: val }));
     if (!auditId) return;
+    const responseText = typeof val === "boolean" ? String(val) : String(val ?? "");
+    if (isOffline) {
+      // No network at all - write straight to the local queue, no debounce needed since IndexedDB writes are cheap
+      queueResponse(auditId, id, responseText).then(refreshPendingCount);
+      return;
+    }
     // Debounce per-item so rapid changes (e.g. slider drag) don't spam the database
     clearTimeout(saveTimers.current[id]);
     saveTimers.current[id] = setTimeout(async () => {
-      const responseText = typeof val === "boolean" ? String(val) : String(val ?? "");
       await supabase.from("audit_responses").upsert(
         { audit_id: auditId, item_id: id, response: responseText },
         { onConflict: "audit_id,item_id" }
@@ -360,6 +462,15 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   if (loading) return (
     <div style={{ fontFamily:"system-ui,sans-serif",maxWidth:680,margin:"0 auto",padding:"3rem",textAlign:"center",color:"#aaa" }}>
       <i className="ti ti-loader-2" style={{ fontSize:32,display:"block",marginBottom:8 }} />Audit laden...
+    </div>
+  );
+
+  if (isOffline && sections.length === 0) return (
+    <div style={{ fontFamily:"system-ui,sans-serif",maxWidth:680,margin:"0 auto",padding:"2rem",textAlign:"center" }}>
+      <i className="ti ti-wifi-off" style={{ fontSize:36,color:"#EF9F27",display:"block",marginBottom:10 }} />
+      <div style={{ fontSize:16,fontWeight:600,marginBottom:8 }}>Geen verbinding en geen offline versie</div>
+      <div style={{ fontSize:13,color:"#888",marginBottom:16 }}>Deze audit is nog niet gedownload voor offline gebruik. Ga terug naar wifi/4G en download de audit eerst.</div>
+      <button onClick={onBack} style={{ padding:"8px 16px",background:"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:13,cursor:"pointer" }}>Terug naar dashboard</button>
     </div>
   );
 
@@ -421,6 +532,32 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         <div style={{ fontSize:15,fontWeight:600 }}>{template?.name}</div>
         <div style={{ fontSize:12,color:"#888",marginTop:1 }}>{locData.name}</div>
       </div>
+
+      {/* Offline status bar */}
+      <div style={{ padding:"8px 1.25rem",background:isOffline?"#FAEEDA":"#F0F7F4",borderBottom:"0.5px solid #eee",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8 }}>
+        <div style={{ fontSize:12,color:isOffline?"#633806":"#0F6E56",display:"flex",alignItems:"center",gap:6 }}>
+          <i className={`ti ${isOffline ? "ti-wifi-off" : "ti-wifi"}`} />
+          {isOffline ? "Offline — wijzigingen worden lokaal opgeslagen" : "Online"}
+          {pendingCount > 0 && <span style={{ fontWeight:600 }}> · {pendingCount} niet gesynchroniseerd</span>}
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          {!isOffline && (
+            <button onClick={handleDownloadOffline} disabled={downloadingOffline} style={{ fontSize:11,color:"#378ADD",border:"0.5px solid #378ADD",borderRadius:6,padding:"4px 9px",background:"none",cursor:downloadingOffline?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
+              <i className="ti ti-download" /> {downloadingOffline ? "Downloaden..." : hasOfflineSnapshot ? "Opnieuw downloaden" : "Download voor offline gebruik"}
+            </button>
+          )}
+          {pendingCount > 0 && !isOffline && (
+            <button onClick={handleSync} disabled={syncing} style={{ fontSize:11,color:"white",border:"none",borderRadius:6,padding:"4px 9px",background:"#1D9E75",cursor:syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
+              <i className="ti ti-refresh" /> {syncing ? "Synchroniseren..." : "Synchroniseer nu"}
+            </button>
+          )}
+        </div>
+      </div>
+      {syncResult && (
+        <div style={{ padding:"6px 1.25rem", fontSize:11, color: syncResult.error ? "#A32D2D" : "#0F6E56", background: syncResult.error ? "#FCEBEB" : "#F0F7F4", borderBottom:"0.5px solid #eee" }}>
+          {syncResult.error ? `Sync mislukt: ${syncResult.error}` : `${syncResult.synced} wijziging(en) gesynchroniseerd${syncResult.failed > 0 ? `, ${syncResult.failed} mislukt` : ""}.`}
+        </div>
+      )}
 
       <div style={{ padding:"10px 1.25rem",background:"#f9f9f9",borderBottom:"0.5px solid #eee",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
         <div style={{ fontSize:12,color:"#888" }}>{answered.length} / {countableItems.length} vragen beantwoord</div>
@@ -484,7 +621,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
                   </>
                 )}
                 {item.answer_type === "stock_take" ? (
-                  <StockTakeTable item={item} auditId={auditId} />
+                  <StockTakeTable item={item} auditId={auditId} isOffline={isOffline} snapshotStockRows={snapshotStockRows} />
                 ) : (
                   <AnswerInput
                     item={item}
@@ -507,9 +644,19 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
 
       {/* SUBMIT */}
       <div style={{ padding:"1rem 1.25rem" }}>
-        <button disabled={submitting} style={{ width:"100%",padding:11,background:submitting?"#9ccab8":"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:14,fontWeight:500,cursor:submitting?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }} onClick={handleSubmit}>
-          <i className="ti ti-send" /> {submitting ? "Bezig met indienen..." : "Audit indienen"}
-        </button>
+        {isOffline ? (
+          <div style={{ fontSize:12,color:"#888",textAlign:"center",padding:"10px",background:"#f5f5f5",borderRadius:8 }}>
+            <i className="ti ti-wifi-off" /> Indienen vereist een verbinding. Synchroniseer eerst zodra je weer online bent.
+          </div>
+        ) : pendingCount > 0 ? (
+          <div style={{ fontSize:12,color:"#633806",textAlign:"center",padding:"10px",background:"#FAEEDA",borderRadius:8 }}>
+            <i className="ti ti-alert-triangle" /> Er staan nog {pendingCount} wijziging(en) klaar om te synchroniseren. Synchroniseer eerst voor je indient.
+          </div>
+        ) : (
+          <button disabled={submitting} style={{ width:"100%",padding:11,background:submitting?"#9ccab8":"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:14,fontWeight:500,cursor:submitting?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }} onClick={handleSubmit}>
+            <i className="ti ti-send" /> {submitting ? "Bezig met indienen..." : "Audit indienen"}
+          </button>
+        )}
       </div>
     </div>
   );
