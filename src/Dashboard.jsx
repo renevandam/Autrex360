@@ -809,6 +809,7 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
   const [linkEmail, setLinkEmail] = useState("");
   const [generatedLink, setGeneratedLink] = useState(null);
   const [linkSaving, setLinkSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -860,7 +861,9 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
 
   const statusColor = { draft: "#EF9F27", submitted: "#1D9E75" };
   const statusLabel = { draft: "Concept", submitted: "Ingediend" };
-  const visibleAudits = audits.filter((a) => !!a.archived === showArchived);
+  const visibleAudits = audits
+    .filter((a) => !!a.archived === showArchived)
+    .filter((a) => !search.trim() || (a.audit_templates?.name || "").toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
     <div style={s.page}>
@@ -873,8 +876,17 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
           <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> Nieuwe audit</button>
         </div>
       </div>
+      <div style={{ marginBottom: 14, position: "relative" }}>
+        <i className="ti ti-search" style={{ position: "absolute", left: 11, top: 10, fontSize: 14, color: "#aaa" }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ ...s.input, paddingLeft: 32 }}
+          placeholder="Zoek op templatenaam..."
+        />
+      </div>
       {loading ? <div style={s.empty}>Laden...</div>
-        : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "Geen gearchiveerde audits." : "Nog geen audits."}</div>
+        : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "Geen gearchiveerde audits." : search.trim() ? "Geen audits gevonden voor deze zoekterm." : "Nog geen audits."}</div>
         : visibleAudits.map((audit) => (
           <div
             key={audit.id}
@@ -886,6 +898,7 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{audit.locations?.name || "Onbekende locatie"}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
                   <i className="ti ti-calendar" style={{ fontSize: 12 }} /> {new Date(audit.audit_date).toLocaleDateString("nl-NL")}
+                  {audit.created_at && <> · <i className="ti ti-clock" style={{ fontSize: 12 }} /> {new Date(audit.created_at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</>}
                   {audit.auditor_name && <> · {audit.auditor_name}</>}
                   {audit.audit_templates?.name && <> · {audit.audit_templates.name}</>}
                 </div>
