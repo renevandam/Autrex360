@@ -951,7 +951,8 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
 
 // ── Dashboard main ────────────────────────────────────────
 // ── Change password modal ───────────────────────────────────
-function ChangePasswordModal({ onClose }) {
+function ChangePasswordModal({ email, onClose }) {
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
@@ -960,9 +961,18 @@ function ChangePasswordModal({ onClose }) {
 
   async function save() {
     setError(null);
-    if (password.length < 6) { setError("Wachtwoord moet minimaal 6 tekens zijn."); return; }
+    if (!currentPassword) { setError("Vul je huidige wachtwoord in."); return; }
+    if (password.length < 6) { setError("Nieuw wachtwoord moet minimaal 6 tekens zijn."); return; }
     if (password !== confirm) { setError("Wachtwoorden komen niet overeen."); return; }
     setSaving(true);
+    // Verify the current password by re-authenticating, since an active session
+    // alone isn't proof of identity (e.g. an unattended device on the work floor)
+    const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (reauthError) {
+      setSaving(false);
+      setError("Huidig wachtwoord is onjuist.");
+      return;
+    }
     const { error: updateError } = await supabase.auth.updateUser({ password });
     setSaving(false);
     if (updateError) { setError(updateError.message); return; }
@@ -980,13 +990,15 @@ function ChangePasswordModal({ onClose }) {
           </>
         ) : (
           <>
-            <div style={s.label}>Nieuw wachtwoord</div>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={s.input} placeholder="Minimaal 6 tekens" autoFocus />
+            <div style={s.label}>Huidig wachtwoord</div>
+            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} style={s.input} placeholder="Je huidige wachtwoord" autoFocus />
+            <div style={{ ...s.label, marginTop: 10 }}>Nieuw wachtwoord</div>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={s.input} placeholder="Minimaal 6 tekens" />
             <div style={{ ...s.label, marginTop: 10 }}>Bevestig nieuw wachtwoord</div>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} style={s.input} placeholder="Herhaal wachtwoord" />
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} style={s.input} placeholder="Herhaal nieuw wachtwoord" />
             {error && <div style={{ fontSize: 12, color: "#E24B4A", marginTop: 8 }}>{error}</div>}
             <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
-              <button style={s.btn(true)} onClick={save} disabled={saving || !password || !confirm}>
+              <button style={s.btn(true)} onClick={save} disabled={saving || !currentPassword || !password || !confirm}>
                 <i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}
               </button>
               <button style={s.btn(false)} onClick={onClose}>Annuleren</button>
@@ -1194,7 +1206,7 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
           <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }}>Uitloggen</button>
         </div>
       </div>
-      {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
+      {showPasswordModal && <ChangePasswordModal email={session.user.email} onClose={() => setShowPasswordModal(false)} />}
       <nav style={s.nav}>
         {navForRole(profile?.role).map((item) => (
           <button key={item.id} style={s.navBtn(page === item.id)} onClick={() => setPage(item.id)}>
