@@ -29,6 +29,7 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
       location_id: locationId,
       template_id: templateId,
       organization_id: profile.organization_id,
+      created_by: session.user.id,
       auditor_name: session.user.email,
       audit_date: new Date().toISOString().slice(0, 10),
       status: "draft",

@@ -957,7 +957,7 @@ const CAN_ARCHIVE_AUDIT = ["admin", "manager"];
 
 function navForRole(role) {
   let nav = NAV;
-  if (role === "viewer") nav = nav.filter((n) => n.id !== "answersets"); // viewers don't manage config
+  if (role === "viewer" || role === "auditor") nav = nav.filter((n) => n.id !== "answersets"); // only admin/manager manage answer sets
   if (role !== "admin") nav = nav.filter((n) => n.id !== "users"); // only admins manage users
   return nav;
 }
