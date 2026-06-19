@@ -128,12 +128,12 @@ export async function exportAuditToPdf(auditId) {
   y = 100;
 
   // ── Summary ──
-  heading(audit.locations?.name || "Onbekende locatie", 16);
+  heading(audit.locations?.name || audit.audit_templates?.name || "Audit", 16);
   bodyLine("Template", audit.audit_templates?.name);
   bodyLine("Datum", new Date(audit.audit_date).toLocaleDateString("nl-NL"));
   bodyLine("Auditor", audit.auditor_name);
   bodyLine("Status", STATUS_LABEL[audit.status] || audit.status);
-  bodyLine("Adres geverifieerd", audit.address_verified ? "Ja" : "Nee");
+  if (audit.location_id) bodyLine("Adres geverifieerd", audit.address_verified ? "Ja" : "Nee");
 
   if (audit.score_pct !== null && audit.score_pct !== undefined) {
     y += 6;
@@ -252,6 +252,6 @@ export async function exportAuditToPdf(auditId) {
     doc.text(`Gegenereerd op ${new Date().toLocaleDateString("nl-NL")}`, margin, pageHeight - 24);
   }
 
-  const fileName = `audit-${(audit.locations?.name || "rapport").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${audit.audit_date}.pdf`;
+  const fileName = `audit-${(audit.locations?.name || audit.audit_templates?.name || "rapport").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${audit.audit_date}.pdf`;
   doc.save(fileName);
 }

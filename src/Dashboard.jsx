@@ -430,6 +430,12 @@ function TemplateDetail({ template, canManage, onBack }) {
   const [newItemForms, setNewItemForms] = useState({});
   const [editingItemId, setEditingItemId] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [requiresLocation, setRequiresLocation] = useState(template.requires_location !== false);
+
+  async function toggleRequiresLocation(checked) {
+    setRequiresLocation(checked);
+    await supabase.from("audit_templates").update({ requires_location: checked }).eq("id", template.id);
+  }
 
   async function load() {
     setLoading(true);
@@ -557,6 +563,12 @@ function TemplateDetail({ template, canManage, onBack }) {
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 600 }}>{template.name}</div>
         {template.description && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{template.description}</div>}
+        {canManage && (
+          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" checked={requiresLocation} onChange={(e) => toggleRequiresLocation(e.target.checked)} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
+            <span style={{ fontSize: 12, color: "#555" }}>Vereist locatie bij het starten van een audit</span>
+          </div>
+        )}
       </div>
 
       {loading ? <div style={s.empty}>Laden...</div> : (
@@ -740,7 +752,7 @@ function Templates({ profile, canManage }) {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "" });
+  const [form, setForm] = useState({ name: "", description: "", requires_location: true });
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
@@ -756,7 +768,7 @@ function Templates({ profile, canManage }) {
   async function save() {
     setSaving(true);
     await supabase.from("audit_templates").insert([{ ...form, is_active: true, organization_id: profile.organization_id }]);
-    setForm({ name: "", description: "" }); setShowForm(false);
+    setForm({ name: "", description: "", requires_location: true }); setShowForm(false);
     await load(); setSaving(false);
   }
   async function remove(id) {
@@ -798,6 +810,11 @@ function Templates({ profile, canManage }) {
             <div style={s.label}>Omschrijving</div>
             <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} style={s.input} placeholder="Optionele toelichting" />
           </div>
+          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" checked={form.requires_location} onChange={(e) => setForm((f) => ({ ...f, requires_location: e.target.checked }))} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
+            <span style={{ fontSize: 12, color: "#555" }}>Vereist locatie bij het starten van een audit</span>
+          </div>
+          <div style={{ fontSize: 11, color: "#aaa", marginTop: 3, marginLeft: 23 }}>Zet uit voor interne checklists die niet aan een specifieke locatie gebonden zijn.</div>
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
             <button style={s.btn(true)} onClick={save} disabled={!form.name || saving}><i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}</button>
             <button style={s.btn(false)} onClick={() => setShowForm(false)}>Annuleren</button>
@@ -814,6 +831,7 @@ function Templates({ profile, canManage }) {
                 {tpl.description && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{tpl.description}</div>}
                 <div style={{ marginTop: 6 }}>
                   <span style={s.badge(tpl.is_active ? "#1D9E75" : "#aaa")}>{tpl.is_active ? "Actief" : "Inactief"}</span>
+                  {tpl.requires_location === false && <span style={s.badge("#888")}>Geen locatie</span>}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -925,8 +943,12 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>
                   {audit.audit_templates?.name || "Audit"}
-                  <span style={{ color: "#bbb", fontWeight: 400 }}> – </span>
-                  {audit.locations?.name || "Onbekende locatie"}
+                  {audit.locations?.name && (
+                    <>
+                      <span style={{ color: "#bbb", fontWeight: 400 }}> – </span>
+                      {audit.locations.name}
+                    </>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
                   <i className="ti ti-calendar" style={{ fontSize: 12 }} /> {new Date(audit.audit_date).toLocaleDateString("nl-NL")}

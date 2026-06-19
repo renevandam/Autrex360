@@ -13,7 +13,7 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
     async function load() {
       const [{ data: locs }, { data: tpls }] = await Promise.all([
         supabase.from("locations").select("id, name").order("name"),
-        supabase.from("audit_templates").select("id, name, description").eq("is_active", true).order("name"),
+        supabase.from("audit_templates").select("id, name, description, requires_location").eq("is_active", true).order("name"),
       ]);
       setLocations(locs || []);
       setTemplates(tpls || []);
@@ -22,11 +22,14 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
     load();
   }, []);
 
+  const selectedTemplate = templates.find((t) => t.id === templateId);
+  const needsLocation = selectedTemplate ? selectedTemplate.requires_location !== false : true;
+
   async function handleStart() {
     if (starting) return;
     setStarting(true);
     const { data: audit, error } = await supabase.from("audits").insert([{
-      location_id: locationId,
+      location_id: needsLocation ? locationId : null,
       template_id: templateId,
       organization_id: profile.organization_id,
       created_by: session.user.id,
@@ -41,9 +44,10 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
     }
     onStart({
       auditId: audit.id,
-      locationId, templateId,
-      location: locations.find((l) => l.id === locationId),
-      template: templates.find((t) => t.id === templateId),
+      locationId: needsLocation ? locationId : null,
+      templateId,
+      location: needsLocation ? locations.find((l) => l.id === locationId) : null,
+      template: selectedTemplate,
     });
   }
 
@@ -58,7 +62,7 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
     startBtnDisabled: { width: "100%", padding: 12, background: "#ccc", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 },
   };
 
-  const canStart = locationId && templateId;
+  const canStart = templateId && (!needsLocation || locationId);
 
   return (
     <div style={s.wrap}>
@@ -71,32 +75,14 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
 
       <div style={s.page}>
         <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Nieuwe audit starten</div>
-        <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>Kies een locatie en template om de audit te starten.</div>
+        <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>
+          {needsLocation ? "Kies een template en locatie om de audit te starten." : "Kies een template om de audit te starten."}
+        </div>
 
         {loading ? (
           <div style={{ textAlign: "center", color: "#aaa", padding: "2rem" }}>Laden...</div>
         ) : (
           <>
-            <div style={{ marginBottom: 20 }}>
-              <label style={s.label}>Locatie *</label>
-              {locations.length === 0 ? (
-                <div style={{ fontSize: 13, color: "#BA7517", background: "#FAEEDA", border: "1px solid #EF9F27", borderRadius: 8, padding: "10px 12px" }}>
-                  ⚠ Nog geen locaties. Voeg eerst een locatie toe in het dashboard.
-                </div>
-              ) : (
-                locations.map((loc) => (
-                  <div key={loc.id} style={s.card(locationId === loc.id)} onClick={() => setLocationId(loc.id)}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${locationId === loc.id ? "#1D9E75" : "#ccc"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        {locationId === loc.id && <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#1D9E75" }} />}
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: locationId === loc.id ? "#085041" : "#333" }}>{loc.name}</div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
             <div style={{ marginBottom: 20 }}>
               <label style={s.label}>Template *</label>
               {templates.length === 0 ? (
@@ -105,7 +91,7 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
                 </div>
               ) : (
                 templates.map((tpl) => (
-                  <div key={tpl.id} style={s.card(templateId === tpl.id)} onClick={() => setTemplateId(tpl.id)}>
+                  <div key={tpl.id} style={s.card(templateId === tpl.id)} onClick={() => { setTemplateId(tpl.id); if (tpl.requires_location === false) setLocationId(""); }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${templateId === tpl.id ? "#1D9E75" : "#ccc"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         {templateId === tpl.id && <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#1D9E75" }} />}
@@ -119,6 +105,28 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
                 ))
               )}
             </div>
+
+            {needsLocation && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={s.label}>Locatie *</label>
+                {locations.length === 0 ? (
+                  <div style={{ fontSize: 13, color: "#BA7517", background: "#FAEEDA", border: "1px solid #EF9F27", borderRadius: 8, padding: "10px 12px" }}>
+                    ⚠ Nog geen locaties. Voeg eerst een locatie toe in het dashboard.
+                  </div>
+                ) : (
+                  locations.map((loc) => (
+                    <div key={loc.id} style={s.card(locationId === loc.id)} onClick={() => setLocationId(loc.id)}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${locationId === loc.id ? "#1D9E75" : "#ccc"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {locationId === loc.id && <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#1D9E75" }} />}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: locationId === loc.id ? "#085041" : "#333" }}>{loc.name}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
 
             <button
               style={canStart && !starting ? s.startBtn : s.startBtnDisabled}

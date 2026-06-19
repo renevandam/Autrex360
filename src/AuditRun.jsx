@@ -294,10 +294,12 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         return;
       }
 
-      const { data: loc } = await supabase.from("locations").select("*").eq("id", locationId).single();
-      if (loc) {
-        const d = { name: loc.name, street: loc.street||"", city: `${loc.postal_code||""} ${loc.city||""}`.trim(), detail: loc.location_detail||"" };
-        setLocData(d); setEditDraft(d);
+      if (locationId) {
+        const { data: loc } = await supabase.from("locations").select("*").eq("id", locationId).single();
+        if (loc) {
+          const d = { name: loc.name, street: loc.street||"", city: `${loc.postal_code||""} ${loc.city||""}`.trim(), detail: loc.location_detail||"" };
+          setLocData(d); setEditDraft(d);
+        }
       }
       const { data: secs } = await supabase.from("template_sections").select("*").eq("template_id", templateId).order("sort_order");
       if (!secs || secs.length === 0) { setSections([]); setLoading(false); return; }
@@ -515,11 +517,11 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
           <i className="ti ti-check" style={{ fontSize:30,color:"#0F6E56" }} />
         </div>
         <h2 style={{ fontSize:19,fontWeight:500,marginBottom:7 }}>Audit ingediend</h2>
-        <p style={{ fontSize:13,color:"#888",marginBottom:"1.5rem" }}>De audit voor {locData.name} is verstuurd.</p>
+        <p style={{ fontSize:13,color:"#888",marginBottom:"1.5rem" }}>{locationId ? `De audit voor ${locData.name} is verstuurd.` : "De audit is verstuurd."}</p>
         <div style={{ background:"#f9f9f9",border:"0.5px solid #eee",borderRadius:10,padding:"1rem",textAlign:"left",marginBottom:"1rem" }}>
           <div style={{ fontSize:11,fontWeight:500,color:"#888",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8 }}>Samenvatting</div>
           {[
-            ["Locatie", locData.name],
+            ...(locationId ? [["Locatie", locData.name]] : []),
             ["Template", template?.name],
             ["Beantwoord", `${answered.length}/${countableItems.length} vragen`],
             ...(relevantMax > 0 ? [["Score", `${pct}% (${Math.round(achieved*10)/10}/${Math.round(relevantMax*10)/10} pt)`]] : []),
@@ -552,7 +554,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
           </div>
         </div>
         <div style={{ fontSize:15,fontWeight:600 }}>{template?.name}</div>
-        <div style={{ fontSize:12,color:"#888",marginTop:1 }}>{locData.name}</div>
+        {locationId && <div style={{ fontSize:12,color:"#888",marginTop:1 }}>{locData.name}</div>}
       </div>
 
       {/* Offline status bar */}
@@ -595,36 +597,38 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
       </div>
 
       {/* LOCATIE */}
-      <div style={sec}>
-        <div style={secTitle}><i className="ti ti-building-warehouse" /> Locatiegegevens</div>
-        <div style={{ background:"#f9f9f9",border:"1px solid #e0e0e0",borderRadius:10,padding:"0.875rem 1rem" }}>
-          <div style={{ fontSize:14,fontWeight:600,marginBottom:3 }}>{locData.name}</div>
-          <div style={{ fontSize:12,color:"#888",lineHeight:1.6 }}>{locData.street}<br />{locData.city}{locData.detail&&<><br />{locData.detail}</>}</div>
-          <div style={{ display:"flex",alignItems:"center",gap:10,marginTop:10,paddingTop:10,borderTop:"0.5px solid #eee",flexWrap:"wrap" }}>
-            <label style={{ display:"flex",alignItems:"center",gap:8,cursor:"pointer" }}>
-              <input type="checkbox" checked={addrVerified} onChange={(e)=>{ const checked=e.target.checked; setAddrVerified(checked); if(checked){setEditOpen(false);setAddrChanged(false);} saveAddressState(checked, locData); }} style={{ width:15,height:15,accentColor:"#1D9E75" }} />
-              <span style={{ fontSize:12 }}>Adres is correct en actueel</span>
-            </label>
-            <button onClick={()=>{ if(!editOpen){setEditDraft({...locData});setAddrVerified(false);setAddrChanged(true);} setEditOpen((v)=>!v); }} style={{ fontSize:11,color:editOpen?"#633806":"#185FA5",border:`0.5px solid ${editOpen?"#EF9F27":"#378ADD"}`,borderRadius:6,padding:"4px 9px",background:editOpen?"#FAEEDA":"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4 }}>
-              <i className={`ti ${editOpen?"ti-x":"ti-pencil"}`} style={{ fontSize:12 }} /> {editOpen?"Sluiten":"Adres aanpassen"}
-            </button>
-          </div>
-          {editOpen && (
-            <div style={{ marginTop:10,background:"white",border:"0.5px solid #EF9F27",borderRadius:8,padding:10 }}>
-              {[["Bedrijfsnaam","name"],["Straat","street"],["Postcode & stad","city"],["Locatiedetail","detail"]].map(([lbl,key]) => (
-                <div key={key}>
-                  <div style={{ fontSize:11,color:"#888",marginBottom:3,marginTop:7 }}>{lbl}</div>
-                  <input value={editDraft[key]} onChange={(e)=>setEditDraft((d)=>({...d,[key]:e.target.value}))} onBlur={()=>{ const updated={...editDraft}; setLocData(updated); setAddrChanged(true); saveAddressState(false, updated); }} style={{ width:"100%",border:"0.5px solid #ddd",borderRadius:6,padding:"6px 9px",fontSize:12,fontFamily:"inherit",background:"white" }} />
-                </div>
-              ))}
+      {locationId && (
+        <div style={sec}>
+          <div style={secTitle}><i className="ti ti-building-warehouse" /> Locatiegegevens</div>
+          <div style={{ background:"#f9f9f9",border:"1px solid #e0e0e0",borderRadius:10,padding:"0.875rem 1rem" }}>
+            <div style={{ fontSize:14,fontWeight:600,marginBottom:3 }}>{locData.name}</div>
+            <div style={{ fontSize:12,color:"#888",lineHeight:1.6 }}>{locData.street}<br />{locData.city}{locData.detail&&<><br />{locData.detail}</>}</div>
+            <div style={{ display:"flex",alignItems:"center",gap:10,marginTop:10,paddingTop:10,borderTop:"0.5px solid #eee",flexWrap:"wrap" }}>
+              <label style={{ display:"flex",alignItems:"center",gap:8,cursor:"pointer" }}>
+                <input type="checkbox" checked={addrVerified} onChange={(e)=>{ const checked=e.target.checked; setAddrVerified(checked); if(checked){setEditOpen(false);setAddrChanged(false);} saveAddressState(checked, locData); }} style={{ width:15,height:15,accentColor:"#1D9E75" }} />
+                <span style={{ fontSize:12 }}>Adres is correct en actueel</span>
+              </label>
+              <button onClick={()=>{ if(!editOpen){setEditDraft({...locData});setAddrVerified(false);setAddrChanged(true);} setEditOpen((v)=>!v); }} style={{ fontSize:11,color:editOpen?"#633806":"#185FA5",border:`0.5px solid ${editOpen?"#EF9F27":"#378ADD"}`,borderRadius:6,padding:"4px 9px",background:editOpen?"#FAEEDA":"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4 }}>
+                <i className={`ti ${editOpen?"ti-x":"ti-pencil"}`} style={{ fontSize:12 }} /> {editOpen?"Sluiten":"Adres aanpassen"}
+              </button>
             </div>
-          )}
-          <div style={{ marginTop:8,fontSize:11,display:"flex",alignItems:"center",gap:5,padding:"5px 9px",borderRadius:6,background:addrVerified?"#E1F5EE":addrChanged?"#FAEEDA":"#f0f0f0",color:addrVerified?"#0F6E56":addrChanged?"#633806":"#aaa" }}>
-            <i className={`ti ${addrVerified?"ti-circle-check":addrChanged?"ti-alert-triangle":"ti-circle-dashed"}`} />
-            {addrVerified?"Bevestigd":addrChanged?"Adres aangepast":"Nog niet geverifieerd"}
+            {editOpen && (
+              <div style={{ marginTop:10,background:"white",border:"0.5px solid #EF9F27",borderRadius:8,padding:10 }}>
+                {[["Bedrijfsnaam","name"],["Straat","street"],["Postcode & stad","city"],["Locatiedetail","detail"]].map(([lbl,key]) => (
+                  <div key={key}>
+                    <div style={{ fontSize:11,color:"#888",marginBottom:3,marginTop:7 }}>{lbl}</div>
+                    <input value={editDraft[key]} onChange={(e)=>setEditDraft((d)=>({...d,[key]:e.target.value}))} onBlur={()=>{ const updated={...editDraft}; setLocData(updated); setAddrChanged(true); saveAddressState(false, updated); }} style={{ width:"100%",border:"0.5px solid #ddd",borderRadius:6,padding:"6px 9px",fontSize:12,fontFamily:"inherit",background:"white" }} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ marginTop:8,fontSize:11,display:"flex",alignItems:"center",gap:5,padding:"5px 9px",borderRadius:6,background:addrVerified?"#E1F5EE":addrChanged?"#FAEEDA":"#f0f0f0",color:addrVerified?"#0F6E56":addrChanged?"#633806":"#aaa" }}>
+              <i className={`ti ${addrVerified?"ti-circle-check":addrChanged?"ti-alert-triangle":"ti-circle-dashed"}`} />
+              {addrVerified?"Bevestigd":addrChanged?"Adres aangepast":"Nog niet geverifieerd"}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* DYNAMIC SECTIONS */}
       {sections.map((section) => {
