@@ -727,6 +727,7 @@ function Templates({ profile, canManage }) {
   const [form, setForm] = useState({ name: "", description: "" });
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -749,15 +750,26 @@ function Templates({ profile, canManage }) {
 
   if (selected) return <TemplateDetail template={selected} canManage={canManage} onBack={() => { setSelected(null); load(); }} />;
 
+  const visibleTemplates = templates.filter((t) => !search.trim() || t.name.toLowerCase().includes(search.trim().toLowerCase()));
+
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
-        <span>Templates ({templates.length})</span>
+        <span>Templates ({visibleTemplates.length})</span>
         {canManage && (
           <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
             <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
           </button>
         )}
+      </div>
+      <div style={{ marginBottom: 14, position: "relative" }}>
+        <i className="ti ti-search" style={{ position: "absolute", left: 11, top: 10, fontSize: 14, color: "#aaa" }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ ...s.input, paddingLeft: 32 }}
+          placeholder="Zoek op templatenaam..."
+        />
       </div>
       {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
@@ -777,8 +789,8 @@ function Templates({ profile, canManage }) {
         </div>
       )}
       {loading ? <div style={s.empty}>Laden...</div>
-        : templates.length === 0 ? <div style={s.empty}><i className="ti ti-file-description" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Nog geen templates.</div>
-        : templates.map((tpl) => (
+        : visibleTemplates.length === 0 ? <div style={s.empty}><i className="ti ti-file-description" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "Geen templates gevonden voor deze zoekterm." : "Nog geen templates."}</div>
+        : visibleTemplates.map((tpl) => (
           <div key={tpl.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => setSelected(tpl)}>
             <div style={s.row}>
               <div>
