@@ -895,12 +895,15 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive }) {
           >
             <div style={s.row}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{audit.locations?.name || "Onbekende locatie"}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {audit.audit_templates?.name || "Audit"}
+                  <span style={{ color: "#bbb", fontWeight: 400 }}> – </span>
+                  {audit.locations?.name || "Onbekende locatie"}
+                </div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
                   <i className="ti ti-calendar" style={{ fontSize: 12 }} /> {new Date(audit.audit_date).toLocaleDateString("nl-NL")}
                   {audit.created_at && <> · <i className="ti ti-clock" style={{ fontSize: 12 }} /> {new Date(audit.created_at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</>}
                   {audit.auditor_name && <> · {audit.auditor_name}</>}
-                  {audit.audit_templates?.name && <> · {audit.audit_templates.name}</>}
                 </div>
                 <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
                   <span style={s.badge(statusColor[audit.status] || "#aaa")}>{statusLabel[audit.status] || audit.status}</span>
