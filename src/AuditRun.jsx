@@ -278,6 +278,8 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [activeSectionId, setActiveSectionId] = useState(null);
+  const [collapsedSections, setCollapsedSections] = useState({}); // sectionId -> boolean
+  const autoCollapsedOnce = useRef({}); // sectionId -> true once we've auto-collapsed it, so re-opening manually sticks
   const sectionRefs = useRef({});
   const navScrollRef = useRef(null);
   const saveTimers = useRef({});
@@ -448,14 +450,34 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   }
 
   function scrollToSection(sectionId) {
+    setCollapsedSections((prev) => ({ ...prev, [sectionId]: false }));
     const el = sectionRefs.current[sectionId];
     if (el) {
       const yOffset = -96; // account for sticky header + nav bar height
-      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      // Wait one tick for the section to expand before measuring its position
+      setTimeout(() => {
+        const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }, 50);
     }
     setActiveSectionId(sectionId);
   }
+
+  function toggleSection(sectionId) {
+    setCollapsedSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  }
+
+  // Auto-collapse a section the first time it becomes fully answered.
+  // Tracked via autoCollapsedOnce so manually re-opening it (e.g. to fix an answer) doesn't get immediately re-collapsed.
+  useEffect(() => {
+    sections.forEach((sec) => {
+      const prog = sectionProgress(sec);
+      if (prog.total > 0 && prog.complete && !autoCollapsedOnce.current[sec.id]) {
+        autoCollapsedOnce.current[sec.id] = true;
+        setCollapsedSections((prev) => ({ ...prev, [sec.id]: true }));
+      }
+    });
+  }, [responses, sections]);
 
   // Track which section is currently in view, to highlight it in the sticky nav
   useEffect(() => {
@@ -726,9 +748,21 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
       {sections.map((section) => {
         const visibleItems = section.items.filter(isVisible);
         if (visibleItems.length === 0) return null;
+        const prog = sectionProgress(section);
+        const collapsed = !!collapsedSections[section.id];
         return (
         <div key={section.id} ref={(el) => { sectionRefs.current[section.id] = el; }} style={sec}>
-          <div style={secTitle}><i className="ti ti-list" /> {section.name}</div>
+          <div style={{ ...secTitle, cursor:"pointer", justifyContent:"space-between" }} onClick={() => toggleSection(section.id)}>
+            <span><i className="ti ti-list" /> {section.name}</span>
+            <span style={{ display:"flex", alignItems:"center", gap:6 }}>
+              {prog.complete
+                ? <i className="ti ti-circle-check" style={{ color:"#1D9E75", fontSize:14 }} />
+                : <span style={{ fontSize:11, color:"#aaa", fontWeight:400 }}>{prog.answered}/{prog.total}</span>
+              }
+              <i className={`ti ${collapsed ? "ti-chevron-down" : "ti-chevron-up"}`} style={{ fontSize:15, color:"#aaa" }} />
+            </span>
+          </div>
+          {!collapsed && (
           <div style={card}>
             {visibleItems.map((item, idx) => (
               <div key={item.id} style={{ padding:"10px 0",borderBottom:idx===visibleItems.length-1?"none":"0.5px solid #e8e8e8",paddingBottom:idx===visibleItems.length-1?0:10 }}>
@@ -761,6 +795,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
               </div>
             ))}
           </div>
+          )}
         </div>
         );
       })}
