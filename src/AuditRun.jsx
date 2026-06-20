@@ -65,6 +65,30 @@ function SignaturePad({ label }) {
 }
 
 // ── Stock take table ──────────────────────────────────────
+// ── Info icon with click-to-show popover (not included in reports/PDF) ──
+function InfoIcon({ text }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  return (
+    <span style={{ position: "relative", display: "inline-block", marginLeft: 5 }}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        style={{ width: 16, height: 16, borderRadius: "50%", border: "1px solid #aaa", background: open ? "#378ADD" : "none", color: open ? "white" : "#aaa", fontSize: 10, fontWeight: 600, lineHeight: 1, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+      >
+        i
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
+          <div style={{ position: "absolute", top: 20, left: 0, zIndex: 999, background: "#333", color: "white", fontSize: 12, lineHeight: 1.4, padding: "8px 10px", borderRadius: 8, minWidth: 200, maxWidth: 260, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+            {text}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
 function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOnline }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -642,7 +666,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
               <div key={item.id} style={{ padding:"10px 0",borderBottom:idx===visibleItems.length-1?"none":"0.5px solid #e8e8e8",paddingBottom:idx===visibleItems.length-1?0:10 }}>
                 {item.answer_type !== "signature" && (
                   <>
-                    <div style={{ fontSize:13,marginBottom:2 }}>{item.label}</div>
+                    <div style={{ fontSize:13,marginBottom:2 }}>{item.label}<InfoIcon text={item.info_text} /></div>
                     {item.sub_label && <div style={{ fontSize:11,color:"#aaa" }}>{item.sub_label}</div>}
                   </>
                 )}

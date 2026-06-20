@@ -478,7 +478,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     await supabase.from("template_sections").delete().eq("id", id); await load();
   }
 
-  const defaultItemForm = { label: "", sub_label: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5" };
+  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5" };
 
   function toggleItemForm(sectionId) {
     setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
@@ -499,6 +499,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       section_id: sectionId,
       label: form.label,
       sub_label: form.sub_label || null,
+      info_text: form.info_text || null,
       answer_type: form.answer_type || "score",
       answer_set_id: form.answer_type === "score" && form.answer_set_id ? form.answer_set_id : null,
       weight: form.weight ? parseFloat(form.weight) : 1,
@@ -521,7 +522,7 @@ function TemplateDetail({ template, canManage, onBack }) {
   function startEdit(item) {
     setEditingItemId(item.id);
     setEditForm({
-      label: item.label, sub_label: item.sub_label || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "",
+      label: item.label, sub_label: item.sub_label || "", info_text: item.info_text || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "",
       weight: item.weight !== null && item.weight !== undefined ? String(item.weight) : "1",
       depends_on_item_id: item.depends_on_item_id || "", depends_on_value: item.depends_on_value || "",
       stock_col1_label: item.stock_col1_label || "Artikelnummer",
@@ -537,6 +538,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     await supabase.from("template_items").update({
       label: editForm.label,
       sub_label: editForm.sub_label || null,
+      info_text: editForm.info_text || null,
       answer_type: editForm.answer_type || "score",
       answer_set_id: editForm.answer_type === "score" && editForm.answer_set_id ? editForm.answer_set_id : null,
       weight: editForm.weight ? parseFloat(editForm.weight) : 1,
@@ -587,6 +589,8 @@ function TemplateDetail({ template, canManage, onBack }) {
                       <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
                       <div style={{ ...s.label, marginTop: 8 }}>Toelichting (optioneel)</div>
                       <input value={editForm.sub_label} onChange={(e) => setEditForm((f) => ({ ...f, sub_label: e.target.value }))} style={s.input} />
+                      <div style={{ ...s.label, marginTop: 8 }}>Info-uitleg (optioneel, via (i)-icoon)</div>
+                      <textarea value={editForm.info_text} onChange={(e) => setEditForm((f) => ({ ...f, info_text: e.target.value }))} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Extra uitleg, normverwijzing of voorbeeld dat verborgen blijft tot de auditor erop klikt" />
                       <div style={{ ...s.label, marginTop: 8 }}>Antwoordtype</div>
                       <select value={editForm.answer_type} onChange={(e) => setEditForm((f) => ({ ...f, answer_type: e.target.value }))} style={s.select}>
                         {ANSWER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -673,6 +677,8 @@ function TemplateDetail({ template, canManage, onBack }) {
                   <input value={newItemForms[section.id]?.label || ""} onChange={(e) => updateItemForm(section.id, "label", e.target.value)} style={s.input} placeholder="bijv. Stellingen vrij van schade" />
                   <div style={{ ...s.label, marginTop: 8 }}>Toelichting (optioneel)</div>
                   <input value={newItemForms[section.id]?.sub_label || ""} onChange={(e) => updateItemForm(section.id, "sub_label", e.target.value)} style={s.input} placeholder="bijv. Geen verbogen staanders" />
+                  <div style={{ ...s.label, marginTop: 8 }}>Info-uitleg (optioneel, via (i)-icoon)</div>
+                  <textarea value={newItemForms[section.id]?.info_text || ""} onChange={(e) => updateItemForm(section.id, "info_text", e.target.value)} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Extra uitleg, normverwijzing of voorbeeld dat verborgen blijft tot de auditor erop klikt" />
                   <div style={{ ...s.label, marginTop: 8 }}>Antwoordtype</div>
                   <select value={newItemForms[section.id]?.answer_type || "score"} onChange={(e) => updateItemForm(section.id, "answer_type", e.target.value)} style={s.select}>
                     {ANSWER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
