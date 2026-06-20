@@ -277,6 +277,9 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [activeSectionId, setActiveSectionId] = useState(null);
+  const sectionRefs = useRef({});
+  const navScrollRef = useRef(null);
   const saveTimers = useRef({});
 
   // Track browser online/offline state so the UI can react immediately
@@ -435,6 +438,41 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   const countableItems = allItems.filter((i) => i.answer_type !== "signature" && i.answer_type !== "stock_take");
   const answered = countableItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "");
   const progress = countableItems.length > 0 ? Math.round((answered.length / countableItems.length) * 100) : 0;
+
+  // Per-section progress, used to drive the sticky nav bar checkmarks/counters
+  function sectionProgress(section) {
+    const visibleItems = section.items.filter(isVisible).filter((i) => i.answer_type !== "signature" && i.answer_type !== "stock_take");
+    if (visibleItems.length === 0) return { answered: 0, total: 0, complete: true };
+    const ans = visibleItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "");
+    return { answered: ans.length, total: visibleItems.length, complete: ans.length === visibleItems.length };
+  }
+
+  function scrollToSection(sectionId) {
+    const el = sectionRefs.current[sectionId];
+    if (el) {
+      const yOffset = -96; // account for sticky header + nav bar height
+      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+    setActiveSectionId(sectionId);
+  }
+
+  // Track which section is currently in view, to highlight it in the sticky nav
+  useEffect(() => {
+    function onScroll() {
+      const sectionEntries = Object.entries(sectionRefs.current);
+      let current = null;
+      for (const [id, el] of sectionEntries) {
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= 140) current = id;
+      }
+      if (current) setActiveSectionId(current);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [sections]);
 
   // Score
   const itemWeight = (i) => i.weight ? Number(i.weight) : 1;
@@ -620,6 +658,36 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         <div style={{ height:3,background:"#1D9E75",width:progress+"%",transition:"width 0.3s" }} />
       </div>
 
+      {/* Sticky section navigation */}
+      {sections.filter((sec) => sec.items.filter(isVisible).length > 0).length > 1 && (
+        <div ref={navScrollRef} style={{ position:"sticky", top:0, zIndex:50, background:"white", borderBottom:"1px solid #eee", display:"flex", gap:6, padding:"8px 1.25rem", overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+          {sections.filter((sec) => sec.items.filter(isVisible).length > 0).map((sec) => {
+            const prog = sectionProgress(sec);
+            const isActive = activeSectionId === sec.id;
+            return (
+              <button
+                key={sec.id}
+                onClick={() => scrollToSection(sec.id)}
+                style={{
+                  flexShrink: 0, display:"flex", alignItems:"center", gap:5,
+                  padding:"6px 11px", borderRadius:20, fontSize:12, fontWeight:500, whiteSpace:"nowrap",
+                  border: isActive ? "1.5px solid #1D9E75" : "1px solid #ddd",
+                  background: isActive ? "#E1F5EE" : "white",
+                  color: isActive ? "#085041" : "#555",
+                  cursor:"pointer",
+                }}
+              >
+                {prog.complete
+                  ? <i className="ti ti-circle-check" style={{ color:"#1D9E75", fontSize:13 }} />
+                  : <span style={{ fontSize:10, color:"#aaa" }}>{prog.answered}/{prog.total}</span>
+                }
+                {sec.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* LOCATIE */}
       {locationId && (
         <div style={sec}>
@@ -659,7 +727,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         const visibleItems = section.items.filter(isVisible);
         if (visibleItems.length === 0) return null;
         return (
-        <div key={section.id} style={sec}>
+        <div key={section.id} ref={(el) => { sectionRefs.current[section.id] = el; }} style={sec}>
           <div style={secTitle}><i className="ti ti-list" /> {section.name}</div>
           <div style={card}>
             {visibleItems.map((item, idx) => (
