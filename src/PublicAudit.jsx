@@ -145,6 +145,8 @@ export default function PublicAudit({ token }) {
   const [submitting, setSubmitting] = useState(false);
   const saveTimers = useRef({});
   const [activeSectionId, setActiveSectionId] = useState(null);
+  const [collapsedSections, setCollapsedSections] = useState({});
+  const autoCollapsedOnce = useRef({});
   const sectionRefs = useRef({});
 
   useEffect(() => {
@@ -234,14 +236,32 @@ export default function PublicAudit({ token }) {
   }
 
   function scrollToSection(sectionId) {
+    setCollapsedSections((prev) => ({ ...prev, [sectionId]: false }));
     const el = sectionRefs.current[sectionId];
     if (el) {
       const yOffset = -56; // account for sticky nav bar height
-      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      setTimeout(() => {
+        const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }, 50);
     }
     setActiveSectionId(sectionId);
   }
+
+  function toggleSection(sectionId) {
+    setCollapsedSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  }
+
+  // Auto-collapse a section the first time it becomes fully answered
+  useEffect(() => {
+    sections.forEach((sec) => {
+      const prog = sectionProgress(sec);
+      if (prog.total > 0 && prog.complete && !autoCollapsedOnce.current[sec.id]) {
+        autoCollapsedOnce.current[sec.id] = true;
+        setCollapsedSections((prev) => ({ ...prev, [sec.id]: true }));
+      }
+    });
+  }, [responses, sections]);
 
   useEffect(() => {
     function onScroll() {
@@ -362,9 +382,21 @@ export default function PublicAudit({ token }) {
       {sections.map((section) => {
         const visibleItems = section.items.filter(isVisible);
         if (visibleItems.length === 0) return null;
+        const prog = sectionProgress(section);
+        const collapsed = !!collapsedSections[section.id];
         return (
           <div key={section.id} ref={(el) => { sectionRefs.current[section.id] = el; }}>
-            <div style={s.secTitle}><i className="ti ti-list" /> {section.name}</div>
+            <div style={{ ...s.secTitle, cursor: "pointer", justifyContent: "space-between" }} onClick={() => toggleSection(section.id)}>
+              <span><i className="ti ti-list" /> {section.name}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {prog.complete
+                  ? <i className="ti ti-circle-check" style={{ color: "#1D9E75", fontSize: 14 }} />
+                  : <span style={{ fontSize: 11, color: "#aaa", fontWeight: 400 }}>{prog.answered}/{prog.total}</span>
+                }
+                <i className={`ti ${collapsed ? "ti-chevron-down" : "ti-chevron-up"}`} style={{ fontSize: 15, color: "#aaa" }} />
+              </span>
+            </div>
+            {!collapsed && (
             <div style={s.card}>
               {visibleItems.map((item, idx) => (
                 <div key={item.id} style={{ padding: "10px 0", borderBottom: idx === visibleItems.length - 1 ? "none" : "0.5px solid #f0f0f0" }}>
@@ -382,6 +414,7 @@ export default function PublicAudit({ token }) {
                 </div>
               ))}
             </div>
+            )}
           </div>
         );
       })}
