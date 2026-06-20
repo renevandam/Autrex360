@@ -236,14 +236,11 @@ export default function PublicAudit({ token }) {
   }
 
   function scrollToSection(sectionId) {
-    setCollapsedSections((prev) => ({ ...prev, [sectionId]: false }));
     const el = sectionRefs.current[sectionId];
     if (el) {
       const yOffset = -56; // account for sticky nav bar height
-      setTimeout(() => {
-        const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-        window.scrollTo({ top: y, behavior: "smooth" });
-      }, 50);
+      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
     }
     setActiveSectionId(sectionId);
   }

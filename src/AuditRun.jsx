@@ -450,15 +450,11 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   }
 
   function scrollToSection(sectionId) {
-    setCollapsedSections((prev) => ({ ...prev, [sectionId]: false }));
     const el = sectionRefs.current[sectionId];
     if (el) {
       const yOffset = -96; // account for sticky header + nav bar height
-      // Wait one tick for the section to expand before measuring its position
-      setTimeout(() => {
-        const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-        window.scrollTo({ top: y, behavior: "smooth" });
-      }, 50);
+      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
     }
     setActiveSectionId(sectionId);
   }
@@ -505,6 +501,15 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   const achieved = scoreItems.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && !opt.is_na; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0)*itemWeight(i); }, 0);
   const pct = relevantMax > 0 ? Math.round((achieved / relevantMax) * 100) : 0;
   const actionItems = allItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_action_item; });
+
+  // Per-section score, using the same weighting/NA logic as the overall score
+  function sectionScore(section) {
+    const items = section.items.filter(isVisible).filter((i) => (i.answer_type === "score" || !i.answer_type) && (itemOptions[i.id]||[]).length > 0);
+    const na = items.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_na; });
+    const max = items.filter((i) => !na.includes(i)).reduce((sum, i) => sum + itemMaxScore(i) * itemWeight(i), 0);
+    const ach = items.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && !opt.is_na; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0)*itemWeight(i); }, 0);
+    return { max, achieved: ach, pct: max > 0 ? Math.round((ach / max) * 100) : null };
+  }
 
   function setResponse(id, val) {
     setResponses((p) => ({ ...p, [id]: val }));
@@ -685,6 +690,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         <div ref={navScrollRef} style={{ position:"sticky", top:0, zIndex:50, background:"white", borderBottom:"1px solid #eee", display:"flex", gap:6, padding:"8px 1.25rem", overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
           {sections.filter((sec) => sec.items.filter(isVisible).length > 0).map((sec) => {
             const prog = sectionProgress(sec);
+            const score = sectionScore(sec);
             const isActive = activeSectionId === sec.id;
             return (
               <button
@@ -704,6 +710,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
                   : <span style={{ fontSize:10, color:"#aaa" }}>{prog.answered}/{prog.total}</span>
                 }
                 {sec.name}
+                {score.pct !== null && <span style={{ fontSize:10, fontWeight:600, color: pctColor(score.pct) }}>{score.pct}%</span>}
               </button>
             );
           })}
@@ -749,12 +756,14 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
         const visibleItems = section.items.filter(isVisible);
         if (visibleItems.length === 0) return null;
         const prog = sectionProgress(section);
+        const score = sectionScore(section);
         const collapsed = !!collapsedSections[section.id];
         return (
         <div key={section.id} ref={(el) => { sectionRefs.current[section.id] = el; }} style={sec}>
           <div style={{ ...secTitle, cursor:"pointer", justifyContent:"space-between" }} onClick={() => toggleSection(section.id)}>
             <span><i className="ti ti-list" /> {section.name}</span>
-            <span style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {score.pct !== null && <span style={{ fontSize:12, fontWeight:600, color: pctColor(score.pct) }}>{score.pct}%</span>}
               {prog.complete
                 ? <i className="ti ti-circle-check" style={{ color:"#1D9E75", fontSize:14 }} />
                 : <span style={{ fontSize:11, color:"#aaa", fontWeight:400 }}>{prog.answered}/{prog.total}</span>
