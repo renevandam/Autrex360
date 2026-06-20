@@ -144,6 +144,8 @@ export default function PublicAudit({ token }) {
   const [emailError, setEmailError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const saveTimers = useRef({});
+  const [activeSectionId, setActiveSectionId] = useState(null);
+  const sectionRefs = useRef({});
 
   useEffect(() => {
     async function load() {
@@ -223,6 +225,40 @@ export default function PublicAudit({ token }) {
     return responses[item.depends_on_item_id] === item.depends_on_value;
   }
 
+  // Per-section progress for the sticky nav bar
+  function sectionProgress(section) {
+    const visibleItems = section.items.filter(isVisible).filter((i) => i.answer_type !== "signature" && i.answer_type !== "stock_take");
+    if (visibleItems.length === 0) return { answered: 0, total: 0, complete: true };
+    const ans = visibleItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "");
+    return { answered: ans.length, total: visibleItems.length, complete: ans.length === visibleItems.length };
+  }
+
+  function scrollToSection(sectionId) {
+    const el = sectionRefs.current[sectionId];
+    if (el) {
+      const yOffset = -56; // account for sticky nav bar height
+      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+    setActiveSectionId(sectionId);
+  }
+
+  useEffect(() => {
+    function onScroll() {
+      const sectionEntries = Object.entries(sectionRefs.current);
+      let current = null;
+      for (const [id, el] of sectionEntries) {
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= 110) current = id;
+      }
+      if (current) setActiveSectionId(current);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [sections]);
+
   // ── Render phases ──
   if (phase === "loading") return (
     <div style={{ textAlign: "center", padding: "4rem", color: "#aaa", fontFamily: "system-ui,sans-serif" }}>
@@ -292,12 +328,42 @@ export default function PublicAudit({ token }) {
         <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{audit?.audit_templates?.name}</div>
       </div>
 
+      {/* Sticky section navigation */}
+      {sections.filter((sec) => sec.items.filter(isVisible).length > 0).length > 1 && (
+        <div style={{ position: "sticky", top: 0, zIndex: 50, background: "#f7f8fa", borderBottom: "1px solid #e8e8e8", display: "flex", gap: 6, padding: "8px 16px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          {sections.filter((sec) => sec.items.filter(isVisible).length > 0).map((sec) => {
+            const prog = sectionProgress(sec);
+            const isActive = activeSectionId === sec.id;
+            return (
+              <button
+                key={sec.id}
+                onClick={() => scrollToSection(sec.id)}
+                style={{
+                  flexShrink: 0, display: "flex", alignItems: "center", gap: 5,
+                  padding: "6px 11px", borderRadius: 20, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
+                  border: isActive ? "1.5px solid #1D9E75" : "1px solid #ddd",
+                  background: isActive ? "#E1F5EE" : "white",
+                  color: isActive ? "#085041" : "#555",
+                  cursor: "pointer",
+                }}
+              >
+                {prog.complete
+                  ? <i className="ti ti-circle-check" style={{ color: "#1D9E75", fontSize: 13 }} />
+                  : <span style={{ fontSize: 10, color: "#aaa" }}>{prog.answered}/{prog.total}</span>
+                }
+                {sec.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Sections */}
       {sections.map((section) => {
         const visibleItems = section.items.filter(isVisible);
         if (visibleItems.length === 0) return null;
         return (
-          <div key={section.id}>
+          <div key={section.id} ref={(el) => { sectionRefs.current[section.id] = el; }}>
             <div style={s.secTitle}><i className="ti ti-list" /> {section.name}</div>
             <div style={s.card}>
               {visibleItems.map((item, idx) => (
