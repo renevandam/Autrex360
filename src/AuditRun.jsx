@@ -61,17 +61,17 @@ function SignaturePad({ label }) {
 
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:7,marginTop:8 }}>
-      <div style={{ fontSize:12,color:"#555",fontWeight:500 }}>{label || "Handtekening"}</div>
-      <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Volledige naam" style={{ border:"0.5px solid #ccc",borderRadius:8,padding:"6px 10px",fontSize:13,fontFamily:"inherit",background:"white",width:"100%" }} />
+      <div style={{ fontSize:12,color:"#555",fontWeight:500 }}>{label || "Signature"}</div>
+      <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Full name" style={{ border:"0.5px solid #ccc",borderRadius:8,padding:"6px 10px",fontSize:13,fontFamily:"inherit",background:"white",width:"100%" }} />
       <div ref={wrapRef} style={{ position:"relative",height:110,border:hasSig?"1.5px solid #1D9E75":"1.5px dashed #ccc",borderRadius:8,overflow:"hidden",cursor:"crosshair",background:"white" }}>
         <canvas ref={canvasRef} style={{ position:"absolute",top:0,left:0,touchAction:"none" }} onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd} onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd} />
-        {!hasSig && <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#aaa",pointerEvents:"none",gap:5 }}><i className="ti ti-pencil" /> Teken hier</div>}
+        {!hasSig && <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#aaa",pointerEvents:"none",gap:5 }}><i className="ti ti-pencil" /> Sign here</div>}
       </div>
       <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-        <button onClick={clear} style={{ fontSize:11,color:"#888",border:"0.5px solid #ddd",borderRadius:6,padding:"3px 9px",background:"none",cursor:"pointer" }}><i className="ti ti-trash" /> Wissen</button>
-        <span style={{ fontSize:11,color:hasSig?"#0F6E56":"#aaa" }}>{hasSig?<><i className="ti ti-check" /> Ondertekend</>:"Niet ondertekend"}</span>
+        <button onClick={clear} style={{ fontSize:11,color:"#888",border:"0.5px solid #ddd",borderRadius:6,padding:"3px 9px",background:"none",cursor:"pointer" }}><i className="ti ti-trash" /> Clear</button>
+        <span style={{ fontSize:11,color:hasSig?"#0F6E56":"#aaa" }}>{hasSig?<><i className="ti ti-check" /> Signed</>:"Not signed"}</span>
       </div>
-      <div style={{ fontSize:11,color:"#aaa",display:"flex",alignItems:"center",gap:4 }}><i className="ti ti-calendar" /> {new Date().toLocaleDateString("nl-NL")}</div>
+      <div style={{ fontSize:11,color:"#aaa",display:"flex",alignItems:"center",gap:4 }}><i className="ti ti-calendar" /> {new Date().toLocaleDateString("en-US")}</div>
     </div>
   );
 }
@@ -108,13 +108,13 @@ function PhotoUpload({ auditId, itemId }) {
         setPhotos((prev) => [...prev, newPhoto]);
       }
     } catch (e) {
-      setError("Upload mislukt: " + e.message);
+      setError("Upload failed: " + e.message);
     }
     setUploading(false);
   }
 
   async function handleDelete(photo) {
-    if (!confirm("Deze foto verwijderen?")) return;
+    if (!confirm("Delete this photo?")) return;
     await deleteAuditPhoto(photo.id, photo.storage_path);
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
   }
@@ -145,14 +145,14 @@ function PhotoUpload({ auditId, itemId }) {
           disabled={uploading}
           style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", border: "0.5px dashed #ccc", borderRadius: 6, padding: "4px 8px", background: "none", cursor: uploading ? "not-allowed" : "pointer" }}
         >
-          <i className="ti ti-camera" /> {uploading ? "Uploaden..." : "Camera"}
+          <i className="ti ti-camera" /> {uploading ? "Uploading..." : "Camera"}
         </button>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", border: "0.5px dashed #ccc", borderRadius: 6, padding: "4px 8px", background: "none", cursor: uploading ? "not-allowed" : "pointer" }}
         >
-          <i className="ti ti-photo" /> Bestand
+          <i className="ti ti-photo" /> File
         </button>
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" multiple style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
@@ -194,9 +194,9 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const maxRows = item.stock_max_rows || 5;
-  const col1 = item.stock_col1_label || "Artikelnummer";
-  const col2 = item.stock_col2_label || "Binlocatie";
-  const col3 = item.stock_col3_label || "Aantal";
+  const col1 = item.stock_col1_label || "Item number";
+  const col2 = item.stock_col2_label || "Bin location";
+  const col3 = item.stock_col3_label || "Quantity";
   const saveTimers = useRef({});
   const pendingValues = useRef({}); // rowIdx -> latest {field: value} not yet flushed
 
@@ -257,7 +257,7 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
     }, 500);
   }
 
-  if (loading) return <div style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>Tabel laden...</div>;
+  if (loading) return <div style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>Loading table...</div>;
 
   return (
     <div style={{ marginTop: 8, overflowX: "auto" }}>
@@ -324,14 +324,14 @@ function AnswerInput({ item, options, value, onChange }) {
     return (
       <label style={{ display:"flex",alignItems:"center",gap:8,marginTop:8,cursor:"pointer" }}>
         <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} style={{ width:16,height:16,accentColor:"#1D9E75" }} />
-        <span style={{ fontSize:13,color:"#555" }}>Akkoord</span>
+        <span style={{ fontSize:13,color:"#555" }}>Agree</span>
       </label>
     );
   }
 
   if (type === "number") {
     return (
-      <input type="number" value={value||""} onChange={(e)=>onChange(e.target.value)} placeholder="Voer een getal in" style={{ border:"1px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:13,fontFamily:"inherit",marginTop:7,width:140 }} />
+      <input type="number" value={value||""} onChange={(e)=>onChange(e.target.value)} placeholder="Enter a number" style={{ border:"1px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:13,fontFamily:"inherit",marginTop:7,width:140 }} />
     );
   }
 
@@ -374,7 +374,7 @@ function AnswerInput({ item, options, value, onChange }) {
 
   // text (default)
   return (
-    <input type="text" value={value||""} onChange={(e)=>onChange(e.target.value)} placeholder="Voer een antwoord in" style={{ border:"1px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:13,fontFamily:"inherit",marginTop:7,width:"100%" }} />
+    <input type="text" value={value||""} onChange={(e)=>onChange(e.target.value)} placeholder="Enter an answer" style={{ border:"1px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:13,fontFamily:"inherit",marginTop:7,width:"100%" }} />
   );
 }
 
@@ -521,7 +521,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
     try {
       await refreshSnapshot(responses);
     } catch (e) {
-      alert("Downloaden voor offline gebruik is mislukt: " + e.message);
+      alert("Downloading for offline use failed: " + e.message);
     }
     setDownloadingOffline(false);
   }
@@ -671,7 +671,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
     try {
       await exportAuditToPdf(auditId);
     } catch (e) {
-      alert("Kon de PDF niet genereren: " + e.message);
+      alert("Could not generate PDF: " + e.message);
     }
     setExportingPdf(false);
   }
@@ -703,24 +703,24 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
 
   if (loading) return (
     <div style={{ fontFamily:"system-ui,sans-serif",maxWidth:680,margin:"0 auto",padding:"3rem",textAlign:"center",color:"#aaa" }}>
-      <i className="ti ti-loader-2" style={{ fontSize:32,display:"block",marginBottom:8 }} />Audit laden...
+      <i className="ti ti-loader-2" style={{ fontSize:32,display:"block",marginBottom:8 }} />Loading audit...
     </div>
   );
 
   if (isOffline && sections.length === 0) return (
     <div style={{ fontFamily:"system-ui,sans-serif",maxWidth:680,margin:"0 auto",padding:"2rem",textAlign:"center" }}>
       <i className="ti ti-wifi-off" style={{ fontSize:36,color:"#EF9F27",display:"block",marginBottom:10 }} />
-      <div style={{ fontSize:16,fontWeight:600,marginBottom:8 }}>Geen verbinding en geen offline versie</div>
-      <div style={{ fontSize:13,color:"#888",marginBottom:16 }}>Deze audit is nog niet gedownload voor offline gebruik. Ga terug naar wifi/4G en download de audit eerst.</div>
-      <button onClick={onBack} style={{ padding:"8px 16px",background:"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:13,cursor:"pointer" }}>Terug naar dashboard</button>
+      <div style={{ fontSize:16,fontWeight:600,marginBottom:8 }}>No connection and no offline version</div>
+      <div style={{ fontSize:13,color:"#888",marginBottom:16 }}>This audit has not been downloaded for offline use yet. Go back to wifi/4G and download the audit first.</div>
+      <button onClick={onBack} style={{ padding:"8px 16px",background:"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:13,cursor:"pointer" }}>Back to dashboard</button>
     </div>
   );
 
   if (sections.length === 0) return (
     <div style={{ fontFamily:"system-ui,sans-serif",maxWidth:680,margin:"0 auto",padding:"2rem",textAlign:"center" }}>
-      <div style={{ fontSize:16,fontWeight:600,marginBottom:8 }}>Geen secties gevonden</div>
-      <div style={{ fontSize:13,color:"#888",marginBottom:16 }}>Dit template heeft nog geen secties en vragen.</div>
-      <button onClick={onBack} style={{ padding:"8px 16px",background:"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:13,cursor:"pointer" }}>Terug naar dashboard</button>
+      <div style={{ fontSize:16,fontWeight:600,marginBottom:8 }}>No sections found</div>
+      <div style={{ fontSize:13,color:"#888",marginBottom:16 }}>This template has no sections and questions yet.</div>
+      <button onClick={onBack} style={{ padding:"8px 16px",background:"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:13,cursor:"pointer" }}>Back to dashboard</button>
     </div>
   );
 
@@ -728,20 +728,20 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
     <div style={{ fontFamily:"system-ui,sans-serif",maxWidth:680,margin:"0 auto",background:"#fff",minHeight:"100vh" }}>
       <div style={{ padding:"1rem 1.25rem",borderBottom:"0.5px solid #eee",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
         <div style={{ fontSize:17,fontWeight:500,display:"flex",alignItems:"center",gap:8 }}><i className="ti ti-clipboard-check" style={{ color:"#1D9E75" }} /> Autrex360</div>
-        <span style={{ fontSize:11,background:"#E1F5EE",color:"#0F6E56",padding:"3px 10px",borderRadius:20 }}>Ingediend</span>
+        <span style={{ fontSize:11,background:"#E1F5EE",color:"#0F6E56",padding:"3px 10px",borderRadius:20 }}>Submitted</span>
       </div>
       <div style={{ padding:"2.5rem 1.25rem",textAlign:"center" }}>
         <div style={{ width:60,height:60,borderRadius:"50%",background:"#E1F5EE",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 1rem" }}>
           <i className="ti ti-check" style={{ fontSize:30,color:"#0F6E56" }} />
         </div>
-        <h2 style={{ fontSize:19,fontWeight:500,marginBottom:7 }}>Audit ingediend</h2>
-        <p style={{ fontSize:13,color:"#888",marginBottom:"1.5rem" }}>{locationId ? `De audit voor ${locData.name} is verstuurd.` : "De audit is verstuurd."}</p>
+        <h2 style={{ fontSize:19,fontWeight:500,marginBottom:7 }}>Audit submitted</h2>
+        <p style={{ fontSize:13,color:"#888",marginBottom:"1.5rem" }}>{locationId ? `The audit for ${locData.name} has been submitted.` : "The audit has been submitted."}</p>
         <div style={{ background:"#f9f9f9",border:"0.5px solid #eee",borderRadius:10,padding:"1rem",textAlign:"left",marginBottom:"1rem" }}>
-          <div style={{ fontSize:11,fontWeight:500,color:"#888",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8 }}>Samenvatting</div>
+          <div style={{ fontSize:11,fontWeight:500,color:"#888",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8 }}>Summary</div>
           {[
-            ...(locationId ? [["Locatie", locData.name]] : []),
+            ...(locationId ? [["Location", locData.name]] : []),
             ["Template", template?.name],
-            ["Beantwoord", `${answered.length}/${countableItems.length} vragen`],
+            ["Beantwoord", `${answered.length}/${countableItems.length} questions`],
             ...(relevantMax > 0 ? [["Score", `${pct}% (${Math.round(achieved*10)/10}/${Math.round(relevantMax*10)/10} pt)`]] : []),
           ].map(([lbl, val], i, arr) => (
             <div key={lbl} style={{ fontSize:13,display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<arr.length-1?"0.5px solid #eee":"none" }}>
@@ -766,7 +766,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
           </button>
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
             <button onClick={handleExportPdf} disabled={exportingPdf} style={{ fontSize:12,color:"#378ADD",border:"0.5px solid #378ADD",borderRadius:6,padding:"4px 9px",background:"none",cursor:exportingPdf?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
-              <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Genereren..." : "PDF"}
+              <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Generating..." : "PDF"}
             </button>
             <div style={{ fontSize:11,color:"#888" }}>{session.user.email}</div>
           </div>
@@ -779,30 +779,30 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       <div style={{ padding:"8px 1.25rem",background:isOffline?"#FAEEDA":"#F0F7F4",borderBottom:"0.5px solid #eee",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8 }}>
         <div style={{ fontSize:12,color:isOffline?"#633806":"#0F6E56",display:"flex",alignItems:"center",gap:6 }}>
           <i className={`ti ${isOffline ? "ti-wifi-off" : "ti-wifi"}`} />
-          {isOffline ? "Offline — wijzigingen worden lokaal opgeslagen" : "Online"}
-          {pendingCount > 0 && <span style={{ fontWeight:600 }}> · {pendingCount} niet gesynchroniseerd</span>}
+          {isOffline ? "Offline — changes are saved locally" : "Online"}
+          {pendingCount > 0 && <span style={{ fontWeight:600 }}> · {pendingCount} not synced</span>}
         </div>
         <div style={{ display:"flex", gap:8 }}>
           {!isOffline && (
             <button onClick={handleDownloadOffline} disabled={downloadingOffline} style={{ fontSize:11,color:"#378ADD",border:"0.5px solid #378ADD",borderRadius:6,padding:"4px 9px",background:"none",cursor:downloadingOffline?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
-              <i className="ti ti-download" /> {downloadingOffline ? "Downloaden..." : hasOfflineSnapshot ? "Opnieuw downloaden" : "Download voor offline gebruik"}
+              <i className="ti ti-download" /> {downloadingOffline ? "Downloading..." : hasOfflineSnapshot ? "Download again" : "Download for offline use"}
             </button>
           )}
           {pendingCount > 0 && !isOffline && (
             <button onClick={handleSync} disabled={syncing} style={{ fontSize:11,color:"white",border:"none",borderRadius:6,padding:"4px 9px",background:"#1D9E75",cursor:syncing?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
-              <i className="ti ti-refresh" /> {syncing ? "Synchroniseren..." : "Synchroniseer nu"}
+              <i className="ti ti-refresh" /> {syncing ? "Syncing..." : "Sync now"}
             </button>
           )}
         </div>
       </div>
       {syncResult && (
         <div style={{ padding:"6px 1.25rem", fontSize:11, color: syncResult.error ? "#A32D2D" : "#0F6E56", background: syncResult.error ? "#FCEBEB" : "#F0F7F4", borderBottom:"0.5px solid #eee" }}>
-          {syncResult.error ? `Sync mislukt: ${syncResult.error}` : `${syncResult.synced} wijziging(en) gesynchroniseerd${syncResult.failed > 0 ? `, ${syncResult.failed} mislukt` : ""}.`}
+          {syncResult.error ? `Sync failed: ${syncResult.error}` : `${syncResult.synced} change(s) synced${syncResult.failed > 0 ? `, ${syncResult.failed} failed` : ""}.`}
         </div>
       )}
 
       <div style={{ padding:"10px 1.25rem",background:"#f9f9f9",borderBottom:"0.5px solid #eee",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-        <div style={{ fontSize:12,color:"#888" }}>{answered.length} / {countableItems.length} vragen beantwoord</div>
+        <div style={{ fontSize:12,color:"#888" }}>{answered.length} / {countableItems.length} questions answered</div>
         <div style={{ textAlign:"right" }}>
           {relevantMax > 0 ? <>
             <div style={{ fontSize:20,fontWeight:600,color:pctColor(pct) }}>{pct}%</div>
@@ -849,22 +849,22 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       {/* LOCATIE */}
       {locationId && (
         <div style={sec}>
-          <div style={secTitle}><i className="ti ti-building-warehouse" /> Locatiegegevens</div>
+          <div style={secTitle}><i className="ti ti-building-warehouse" /> Location details</div>
           <div style={{ background:"#f9f9f9",border:"1px solid #e0e0e0",borderRadius:10,padding:"0.875rem 1rem" }}>
             <div style={{ fontSize:14,fontWeight:600,marginBottom:3 }}>{locData.name}</div>
             <div style={{ fontSize:12,color:"#888",lineHeight:1.6 }}>{locData.street}<br />{locData.city}{locData.detail&&<><br />{locData.detail}</>}</div>
             <div style={{ display:"flex",alignItems:"center",gap:10,marginTop:10,paddingTop:10,borderTop:"0.5px solid #eee",flexWrap:"wrap" }}>
               <label style={{ display:"flex",alignItems:"center",gap:8,cursor:"pointer" }}>
                 <input type="checkbox" checked={addrVerified} onChange={(e)=>{ const checked=e.target.checked; setAddrVerified(checked); if(checked){setEditOpen(false);setAddrChanged(false);} saveAddressState(checked, locData); }} style={{ width:15,height:15,accentColor:"#1D9E75" }} />
-                <span style={{ fontSize:12 }}>Adres is correct en actueel</span>
+                <span style={{ fontSize:12 }}>Address is correct and up to date</span>
               </label>
               <button onClick={()=>{ if(!editOpen){setEditDraft({...locData});setAddrVerified(false);setAddrChanged(true);} setEditOpen((v)=>!v); }} style={{ fontSize:11,color:editOpen?"#633806":"#185FA5",border:`0.5px solid ${editOpen?"#EF9F27":"#378ADD"}`,borderRadius:6,padding:"4px 9px",background:editOpen?"#FAEEDA":"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4 }}>
-                <i className={`ti ${editOpen?"ti-x":"ti-pencil"}`} style={{ fontSize:12 }} /> {editOpen?"Sluiten":"Adres aanpassen"}
+                <i className={`ti ${editOpen?"ti-x":"ti-pencil"}`} style={{ fontSize:12 }} /> {editOpen?"Close":"Edit address"}
               </button>
             </div>
             {editOpen && (
               <div style={{ marginTop:10,background:"white",border:"0.5px solid #EF9F27",borderRadius:8,padding:10 }}>
-                {[["Bedrijfsnaam","name"],["Straat","street"],["Postcode & stad","city"],["Locatiedetail","detail"]].map(([lbl,key]) => (
+                {[["Company name","name"],["Street","street"],["Postal code & city","city"],["Location detail","detail"]].map(([lbl,key]) => (
                   <div key={key}>
                     <div style={{ fontSize:11,color:"#888",marginBottom:3,marginTop:7 }}>{lbl}</div>
                     <input value={editDraft[key]} onChange={(e)=>setEditDraft((d)=>({...d,[key]:e.target.value}))} onBlur={()=>{ const updated={...editDraft}; setLocData(updated); setAddrChanged(true); saveAddressState(false, updated); }} style={{ width:"100%",border:"0.5px solid #ddd",borderRadius:6,padding:"6px 9px",fontSize:12,fontFamily:"inherit",background:"white" }} />
@@ -874,7 +874,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
             )}
             <div style={{ marginTop:8,fontSize:11,display:"flex",alignItems:"center",gap:5,padding:"5px 9px",borderRadius:6,background:addrVerified?"#E1F5EE":addrChanged?"#FAEEDA":"#f0f0f0",color:addrVerified?"#0F6E56":addrChanged?"#633806":"#aaa" }}>
               <i className={`ti ${addrVerified?"ti-circle-check":addrChanged?"ti-alert-triangle":"ti-circle-dashed"}`} />
-              {addrVerified?"Bevestigd":addrChanged?"Adres aangepast":"Nog niet geverifieerd"}
+              {addrVerified?"Confirmed":addrChanged?"Address changed":"Not yet verified"}
             </div>
           </div>
         </div>
@@ -940,15 +940,15 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       <div style={{ padding:"1rem 1.25rem" }}>
         {isOffline ? (
           <div style={{ fontSize:12,color:"#888",textAlign:"center",padding:"10px",background:"#f5f5f5",borderRadius:8 }}>
-            <i className="ti ti-wifi-off" /> Indienen vereist een verbinding. Synchroniseer eerst zodra je weer online bent.
+            <i className="ti ti-wifi-off" /> Submitting requires a connection. Sync first once you are back online.
           </div>
         ) : pendingCount > 0 ? (
           <div style={{ fontSize:12,color:"#633806",textAlign:"center",padding:"10px",background:"#FAEEDA",borderRadius:8 }}>
-            <i className="ti ti-alert-triangle" /> Er staan nog {pendingCount} wijziging(en) klaar om te synchroniseren. Synchroniseer eerst voor je indient.
+            <i className="ti ti-alert-triangle" /> There are still {pendingCount} change(s) waiting to be synced. Sync first before submitting.
           </div>
         ) : (
           <button disabled={submitting} style={{ width:"100%",padding:11,background:submitting?"#9ccab8":"#1D9E75",color:"white",border:"none",borderRadius:8,fontSize:14,fontWeight:500,cursor:submitting?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }} onClick={handleSubmit}>
-            <i className="ti ti-send" /> {submitting ? "Bezig met indienen..." : "Audit indienen"}
+            <i className="ti ti-send" /> {submitting ? "Submitting..." : "Submit audit"}
           </button>
         )}
       </div>

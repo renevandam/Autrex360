@@ -39,7 +39,7 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
     }]).select().single();
     setStarting(false);
     if (error || !audit) {
-      alert("Kon de audit niet aanmaken: " + (error?.message || "onbekende fout"));
+      alert("Could not create the audit: " + (error?.message || "unknown error"));
       return;
     }
     onStart({
@@ -74,20 +74,20 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
       </div>
 
       <div style={s.page}>
-        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Nieuwe audit starten</div>
+        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Start new audit</div>
         <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>
-          {needsLocation ? "Kies een template en locatie om de audit te starten." : "Kies een template om de audit te starten."}
+          {needsLocation ? "Choose a template and location to start the audit." : "Choose a template to start the audit."}
         </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", color: "#aaa", padding: "2rem" }}>Laden...</div>
+          <div style={{ textAlign: "center", color: "#aaa", padding: "2rem" }}>Loading...</div>
         ) : (
           <>
             <div style={{ marginBottom: 20 }}>
               <label style={s.label}>Template *</label>
               {templates.length === 0 ? (
                 <div style={{ fontSize: 13, color: "#BA7517", background: "#FAEEDA", border: "1px solid #EF9F27", borderRadius: 8, padding: "10px 12px" }}>
-                  ⚠ Nog geen actieve templates. Maak eerst een template aan.
+                  ⚠ No active templates yet. Create a template first.
                 </div>
               ) : (
                 templates.map((tpl) => (
@@ -108,10 +108,10 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
 
             {needsLocation && (
               <div style={{ marginBottom: 20 }}>
-                <label style={s.label}>Locatie *</label>
+                <label style={s.label}>Location *</label>
                 {locations.length === 0 ? (
                   <div style={{ fontSize: 13, color: "#BA7517", background: "#FAEEDA", border: "1px solid #EF9F27", borderRadius: 8, padding: "10px 12px" }}>
-                    ⚠ Nog geen locaties. Voeg eerst een locatie toe in het dashboard.
+                    ⚠ No locations yet. Add a location in the dashboard first.
                   </div>
                 ) : (
                   locations.map((loc) => (
@@ -133,7 +133,7 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
               disabled={!canStart || starting}
               onClick={handleStart}
             >
-              <i className="ti ti-clipboard-check" /> {starting ? "Audit aanmaken..." : "Audit starten"}
+              <i className="ti ti-clipboard-check" /> {starting ? "Creating audit..." : "Start audit"}
             </button>
           </>
         )}
