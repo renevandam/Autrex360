@@ -12,7 +12,7 @@ export async function loadAuditReportData(auditId) {
   if (!audit) throw new Error("Audit niet gevonden");
 
   const { data: organization } = audit.organization_id
-    ? await supabase.from("organizations").select("name, address, logo_url").eq("id", audit.organization_id).single()
+    ? await supabase.from("organizations").select("name, address, logo_url, primary_color").eq("id", audit.organization_id).single()
     : { data: null };
 
   const { data: sections } = await supabase
