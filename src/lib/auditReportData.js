@@ -60,6 +60,14 @@ export function answerLabel(item, optionsBySet, responseByItem) {
   }
   if (item.answer_type === "checkbox") return raw === "true" ? "Ja" : "Nee";
   if (item.answer_type === "slider") return `${raw}%`;
+  if (item.answer_type === "datetime") {
+    const mode = item.datetime_mode || "date";
+    if (mode === "time") return raw; // already HH:MM
+    const d = new Date(mode === "date" ? `${raw}T00:00` : raw);
+    if (isNaN(d.getTime())) return raw;
+    if (mode === "date") return d.toLocaleDateString("nl-NL");
+    return d.toLocaleString("nl-NL", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
   return String(raw);
 }
 

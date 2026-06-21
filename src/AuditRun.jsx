@@ -12,6 +12,17 @@ function pctColor(pct) {
   return "#085041";
 }
 
+// Current date/time formatted for the matching HTML input type
+function nowForMode(mode) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const timePart = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  if (mode === "time") return timePart;
+  if (mode === "datetime") return `${datePart}T${timePart}`;
+  return datePart; // "date"
+}
+
 const card = { border: "1px solid #e0e0e0", borderRadius: 10, padding: "0.875rem 1rem", background: "#fafafa" };
 const sec = { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" };
 const secTitle = { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 };
@@ -192,6 +203,15 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
 function AnswerInput({ item, options, value, onChange }) {
   const type = item.answer_type || "score";
 
+  // Auto-fill datetime questions with the current moment the first time they're shown.
+  // Placed unconditionally at the top, per React's rules of hooks - the type check happens inside.
+  useEffect(() => {
+    if (type === "datetime" && (value === undefined || value === null || value === "")) {
+      onChange(nowForMode(item.datetime_mode || "date"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
+
   if (type === "score" && options.length > 0) {
     return (
       <div style={{ display:"flex",gap:5,flexWrap:"wrap",marginTop:7 }}>
@@ -247,6 +267,19 @@ function AnswerInput({ item, options, value, onChange }) {
 
   if (type === "signature") {
     return <SignaturePad label={item.label} />;
+  }
+
+  if (type === "datetime") {
+    const mode = item.datetime_mode || "date";
+    const htmlType = mode === "time" ? "time" : mode === "datetime" ? "datetime-local" : "date";
+    return (
+      <input
+        type={htmlType}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ border:"1px solid #ddd", borderRadius:8, padding:"7px 10px", fontSize:13, fontFamily:"inherit", marginTop:7, width: mode === "date" ? 160 : mode === "time" ? 130 : 210 }}
+      />
+    );
   }
 
   // text (default)

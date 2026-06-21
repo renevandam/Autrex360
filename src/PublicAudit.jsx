@@ -1,6 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 
+// Current date/time formatted for the matching HTML input type
+function nowForMode(mode) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const timePart = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  if (mode === "time") return timePart;
+  if (mode === "datetime") return `${datePart}T${timePart}`;
+  return datePart;
+}
+
 const s = {
   wrap: { fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 600, margin: "0 auto", padding: "0 0 3rem 0", background: "#f7f8fa", minHeight: "100vh" },
   header: { background: "#09325A", padding: "16px 20px", display: "flex", alignItems: "center", gap: 10 },
@@ -39,6 +50,15 @@ function InfoIcon({ text }) {
 
 function AnswerInput({ item, options, value, onChange }) {
   const type = item.answer_type;
+
+  // Auto-fill datetime questions with the current moment, unconditional hook per React's rules
+  useEffect(() => {
+    if (type === "datetime" && (value === undefined || value === null || value === "")) {
+      onChange(nowForMode(item.datetime_mode || "date"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
+
   if (type === "score") {
     return (
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
@@ -71,6 +91,13 @@ function AnswerInput({ item, options, value, onChange }) {
         <input type="range" min={0} max={100} value={value || 0} onChange={(e) => onChange(e.target.value)} style={{ width: "100%", accentColor: "#1D9E75" }} />
         <div style={{ textAlign: "center", fontSize: 13, color: "#555", marginTop: 4 }}>{value || 0}%</div>
       </div>
+    );
+  }
+  if (type === "datetime") {
+    const mode = item.datetime_mode || "date";
+    const htmlType = mode === "time" ? "time" : mode === "datetime" ? "datetime-local" : "date";
+    return (
+      <input type={htmlType} value={value || ""} onChange={(e) => onChange(e.target.value)} style={{ ...s.input, marginTop: 7, width: mode === "date" ? 160 : mode === "time" ? 130 : 210 }} />
     );
   }
   return null;

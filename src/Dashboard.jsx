@@ -19,6 +19,13 @@ const ANSWER_TYPES = [
   { value: "slider",     label: "Slider (0-100%)" },
   { value: "signature",  label: "Handtekening" },
   { value: "stock_take", label: "Stock take (tabel)" },
+  { value: "datetime",   label: "Datum/Tijd" },
+];
+
+const DATETIME_MODES = [
+  { value: "date",     label: "Datum" },
+  { value: "time",     label: "Tijd" },
+  { value: "datetime", label: "Datum en tijd" },
 ];
 
 const OPTION_COLORS = ["#E24B4A","#E07B3A","#EF9F27","#639922","#1D9E75","#378ADD","#888"];
@@ -492,7 +499,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     await load();
   }
 
-  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5" };
+  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5", datetime_mode: "date" };
 
   function toggleItemForm(sectionId) {
     setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
@@ -523,6 +530,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_col2_label: form.stock_col2_label || "Binlocatie",
       stock_col3_label: form.stock_col3_label || "Aantal",
       stock_max_rows: form.stock_max_rows ? parseInt(form.stock_max_rows) : 5,
+      datetime_mode: form.datetime_mode || "date",
       sort_order: (items[sectionId] || []).length,
     }]);
     setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, open: false } }));
@@ -557,6 +565,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_col2_label: item.stock_col2_label || "Binlocatie",
       stock_col3_label: item.stock_col3_label || "Aantal",
       stock_max_rows: item.stock_max_rows !== null && item.stock_max_rows !== undefined ? String(item.stock_max_rows) : "5",
+      datetime_mode: item.datetime_mode || "date",
       _sectionId: item.section_id,
     });
   }
@@ -576,6 +585,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_col2_label: editForm.stock_col2_label || "Binlocatie",
       stock_col3_label: editForm.stock_col3_label || "Aantal",
       stock_max_rows: editForm.stock_max_rows ? parseInt(editForm.stock_max_rows) : 5,
+      datetime_mode: editForm.datetime_mode || "date",
     }).eq("id", editingItemId);
     setEditingItemId(null); setEditForm({});
     await load();
@@ -648,6 +658,14 @@ function TemplateDetail({ template, canManage, onBack }) {
                           <input value={editForm.stock_col3_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col3_label: e.target.value }))} style={s.input} placeholder="bijv. Aantal" />
                           <div style={{ ...s.label, marginTop: 8 }}>Max. aantal rijen</div>
                           <input type="number" min="1" max="20" value={editForm.stock_max_rows} onChange={(e) => setEditForm((f) => ({ ...f, stock_max_rows: e.target.value }))} style={s.input} />
+                        </>
+                      )}
+                      {editForm.answer_type === "datetime" && (
+                        <>
+                          <div style={{ ...s.label, marginTop: 8 }}>Type</div>
+                          <select value={editForm.datetime_mode} onChange={(e) => setEditForm((f) => ({ ...f, datetime_mode: e.target.value }))} style={s.select}>
+                            {DATETIME_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                          </select>
                         </>
                       )}
                       <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
@@ -739,6 +757,14 @@ function TemplateDetail({ template, canManage, onBack }) {
                       <input value={newItemForms[section.id]?.stock_col3_label ?? "Aantal"} onChange={(e) => updateItemForm(section.id, "stock_col3_label", e.target.value)} style={s.input} placeholder="bijv. Aantal" />
                       <div style={{ ...s.label, marginTop: 8 }}>Max. aantal rijen</div>
                       <input type="number" min="1" max="20" value={newItemForms[section.id]?.stock_max_rows ?? "5"} onChange={(e) => updateItemForm(section.id, "stock_max_rows", e.target.value)} style={s.input} />
+                    </>
+                  )}
+                  {newItemForms[section.id]?.answer_type === "datetime" && (
+                    <>
+                      <div style={{ ...s.label, marginTop: 8 }}>Type</div>
+                      <select value={newItemForms[section.id]?.datetime_mode ?? "date"} onChange={(e) => updateItemForm(section.id, "datetime_mode", e.target.value)} style={s.select}>
+                        {DATETIME_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      </select>
                     </>
                   )}
                   <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
