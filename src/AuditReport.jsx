@@ -7,6 +7,7 @@ export default function AuditReport({ auditId, onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -56,7 +57,7 @@ export default function AuditReport({ auditId, onBack }) {
     </div>
   );
 
-  const { audit, sections, optionsBySet, responseByItem, stockByItem } = data;
+  const { audit, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = data;
 
   const actionItems = [];
   sections.forEach((sec) => sec.items.forEach((item) => {
@@ -168,12 +169,30 @@ export default function AuditReport({ auditId, onBack }) {
                       </div>
                     </div>
                   )}
+                  {(photosByItem[item.id] || []).length > 0 && (
+                    <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                      {photosByItem[item.id].map((photo) => (
+                        <img
+                          key={photo.id}
+                          src={photo.url}
+                          onClick={() => setLightboxUrl(photo.url)}
+                          style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 6, cursor: "pointer", border: "1px solid #ddd" }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
       ))}
+
+      {lightboxUrl && (
+        <div onClick={() => setLightboxUrl(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <img src={lightboxUrl} style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 8 }} />
+        </div>
+      )}
 
       <div style={{ height: 30 }} />
     </div>

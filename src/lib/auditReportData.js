@@ -25,10 +25,11 @@ export async function loadAuditReportData(auditId) {
   const itemIds = (items || []).map((i) => i.id);
   const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
 
-  const [{ data: options }, { data: responses }, { data: stockRows }] = await Promise.all([
+  const [{ data: options }, { data: responses }, { data: stockRows }, { data: photoRows }] = await Promise.all([
     setIds.length ? supabase.from("answer_options").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
     itemIds.length ? supabase.from("audit_responses").select("*").in("item_id", itemIds).eq("audit_id", auditId) : Promise.resolve({ data: [] }),
     itemIds.length ? supabase.from("stock_checks").select("*").in("item_id", itemIds).eq("audit_id", auditId).order("row_order") : Promise.resolve({ data: [] }),
+    itemIds.length ? supabase.from("audit_photos").select("*").in("item_id", itemIds).eq("audit_id", auditId).order("created_at") : Promise.resolve({ data: [] }),
   ]);
 
   const optionsBySet = {};
@@ -37,6 +38,11 @@ export async function loadAuditReportData(auditId) {
   (responses || []).forEach((r) => { responseByItem[r.item_id] = r.response; });
   const stockByItem = {};
   (stockRows || []).forEach((r) => { stockByItem[r.item_id] = stockByItem[r.item_id] || []; stockByItem[r.item_id].push(r); });
+  const photosByItem = {};
+  (photoRows || []).forEach((p) => {
+    photosByItem[p.item_id] = photosByItem[p.item_id] || [];
+    photosByItem[p.item_id].push({ ...p, url: supabase.storage.from("audit-photos").getPublicUrl(p.storage_path).data.publicUrl });
+  });
 
   const itemsBySection = {};
   (items || []).forEach((it) => { itemsBySection[it.section_id] = itemsBySection[it.section_id] || []; itemsBySection[it.section_id].push(it); });
@@ -47,6 +53,7 @@ export async function loadAuditReportData(auditId) {
     optionsBySet,
     responseByItem,
     stockByItem,
+    photosByItem,
   };
 }
 

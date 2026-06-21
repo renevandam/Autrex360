@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import { exportAuditToPdf } from "./lib/exportPdf";
 import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, countPending } from "./lib/offlineStore";
 import { syncAuditToServer } from "./lib/offlineSync";
+import { uploadAuditPhoto, getPhotosForItem, deleteAuditPhoto } from "./lib/photoStorage";
 
 function pctColor(pct) {
   if (pct < 20) return "#A32D2D";
@@ -77,6 +78,95 @@ function SignaturePad({ label }) {
 
 // ── Stock take table ──────────────────────────────────────
 // ── Info icon with click-to-show popover (not included in reports/PDF) ──
+// ── Photo upload: camera capture or file picker, with thumbnails + lightbox ──
+function PhotoUpload({ auditId, itemId }) {
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [error, setError] = useState(null);
+  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    async function load() {
+      if (!auditId) { setLoading(false); return; }
+      const data = await getPhotosForItem(auditId, itemId);
+      setPhotos(data);
+      setLoading(false);
+    }
+    load();
+  }, [auditId, itemId]);
+
+  async function handleFiles(fileList) {
+    if (!fileList || fileList.length === 0 || !auditId) return;
+    setUploading(true);
+    setError(null);
+    try {
+      for (const file of Array.from(fileList)) {
+        const newPhoto = await uploadAuditPhoto(auditId, itemId, file);
+        setPhotos((prev) => [...prev, newPhoto]);
+      }
+    } catch (e) {
+      setError("Upload mislukt: " + e.message);
+    }
+    setUploading(false);
+  }
+
+  async function handleDelete(photo) {
+    if (!confirm("Deze foto verwijderen?")) return;
+    await deleteAuditPhoto(photo.id, photo.storage_path);
+    setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+  }
+
+  if (loading) return null;
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {error && <div style={{ fontSize: 11, color: "#E24B4A", marginBottom: 6 }}>{error}</div>}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {photos.map((photo) => (
+          <div key={photo.id} style={{ position: "relative", width: 52, height: 52 }}>
+            <img
+              src={photo.url}
+              onClick={() => setLightboxUrl(photo.url)}
+              style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 6, cursor: "pointer", border: "1px solid #ddd" }}
+            />
+            <button
+              onClick={() => handleDelete(photo)}
+              style={{ position: "absolute", top: -5, right: -5, width: 16, height: 16, borderRadius: "50%", background: "#E24B4A", color: "white", border: "none", fontSize: 10, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={uploading}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", border: "0.5px dashed #ccc", borderRadius: 6, padding: "4px 8px", background: "none", cursor: uploading ? "not-allowed" : "pointer" }}
+        >
+          <i className="ti ti-camera" /> {uploading ? "Uploaden..." : "Camera"}
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", border: "0.5px dashed #ccc", borderRadius: 6, padding: "4px 8px", background: "none", cursor: uploading ? "not-allowed" : "pointer" }}
+        >
+          <i className="ti ti-photo" /> Bestand
+        </button>
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" multiple style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
+        <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
+      </div>
+
+      {lightboxUrl && (
+        <div onClick={() => setLightboxUrl(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <img src={lightboxUrl} style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 8 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InfoIcon({ text }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
@@ -293,7 +383,6 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
   const [sections, setSections] = useState([]);
   const [itemOptions, setItemOptions] = useState({});
   const [responses, setResponses] = useState({});
-  const [photos, setPhotos] = useState({});
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("audit");
   const [addrVerified, setAddrVerified] = useState(false);
@@ -830,9 +919,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
                   />
                 )}
                 {item.answer_type !== "signature" && item.answer_type !== "stock_take" && item.answer_type !== "datetime" && (
-                  photos[item.id]
-                    ? <div style={{ fontSize:11,color:"#0F6E56",marginTop:6,display:"flex",alignItems:"center",gap:4 }}><i className="ti ti-photo-check" /> 1 foto toegevoegd</div>
-                    : <button style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#888",border:"0.5px dashed #ccc",borderRadius:6,padding:"4px 8px",background:"none",cursor:"pointer",marginTop:6 }} onClick={()=>setPhotos((p)=>({...p,[item.id]:true}))}><i className="ti ti-camera" /> Foto toevoegen</button>
+                  <PhotoUpload auditId={auditId} itemId={item.id} />
                 )}
               </div>
             ))}

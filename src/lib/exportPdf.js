@@ -9,13 +9,29 @@ const RED = [226, 75, 74];           // #E24B4A
 const GREY = [136, 136, 136];
 
 export async function exportAuditToPdf(auditId) {
-  const { audit, sections, optionsBySet, responseByItem, stockByItem } = await loadAuditReportData(auditId);
+  const { audit, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = await loadAuditReportData(auditId);
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 48;
   let y = margin;
+
+  // Fetch an image and convert to base64 so jsPDF can embed it
+  async function loadImageAsDataUrl(url) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null; // skip photos that fail to load rather than breaking the whole PDF
+    }
+  }
 
   function ensureSpace(needed) {
     if (y + needed > pageHeight - margin) {
@@ -124,7 +140,7 @@ export async function exportAuditToPdf(auditId) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 24;
 
-  sections.forEach((section) => {
+  for (const section of sections) {
     heading(section.name, 13, BRAND_BLUE);
     if (section.items.length === 0) {
       doc.setFont("helvetica", "italic");
@@ -134,8 +150,8 @@ export async function exportAuditToPdf(auditId) {
       doc.text("Geen vragen in deze sectie.", margin, y);
       y += 16;
     }
-    section.items.forEach((item) => {
-      if (item.answer_type === "signature") return; // signatures shown separately if needed
+    for (const item of section.items) {
+      if (item.answer_type === "signature") continue; // signatures shown separately if needed
       ensureSpace(30);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
@@ -167,9 +183,35 @@ export async function exportAuditToPdf(auditId) {
         doc.text(wrappedAnswer, pageWidth - margin - 150, y);
         y += Math.max(wrappedLabel.length, wrappedAnswer.length) * 13 + 4;
       }
-    });
+
+      // Embed photos for this question, thumbnail-sized, wrapping to new rows as needed
+      const photos = photosByItem[item.id] || [];
+      if (photos.length > 0) {
+        const thumbSize = 50;
+        const gap = 6;
+        let xPos = margin;
+        ensureSpace(thumbSize + 6);
+        const rowStartY = y;
+        for (const photo of photos) {
+          const dataUrl = await loadImageAsDataUrl(photo.url);
+          if (!dataUrl) continue;
+          if (xPos + thumbSize > pageWidth - margin) {
+            xPos = margin;
+            y += thumbSize + gap;
+            ensureSpace(thumbSize + 6);
+          }
+          try {
+            doc.addImage(dataUrl, "JPEG", xPos, y, thumbSize, thumbSize);
+          } catch {
+            // skip images jsPDF can't decode (e.g. unsupported format)
+          }
+          xPos += thumbSize + gap;
+        }
+        y += thumbSize + 8;
+      }
+    }
     y += 8;
-  });
+  }
 
   // ── Footer with page numbers ──
   const pageCount = doc.internal.getNumberOfPages();
