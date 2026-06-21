@@ -8,6 +8,14 @@ const ORANGE = [239, 159, 39];       // #EF9F27
 const RED = [226, 75, 74];           // #E24B4A
 const GREY = [136, 136, 136];
 
+// Converts a "#rrggbb" string to an [r,g,b] array for jsPDF color functions
+function hexToRgb(hex, fallback) {
+  if (!hex) return fallback;
+  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!match) return fallback;
+  return [parseInt(match[1], 16), parseInt(match[2], 16), parseInt(match[3], 16)];
+}
+
 export async function exportAuditToPdf(auditId) {
   const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = await loadAuditReportData(auditId);
 
@@ -62,15 +70,18 @@ export async function exportAuditToPdf(auditId) {
   }
 
   // ── Header ──
-  doc.setFillColor(...BRAND_BLUE);
+  const headerColor = hexToRgb(organization?.primary_color, BRAND_BLUE);
+  doc.setFillColor(...headerColor);
   doc.rect(0, 0, pageWidth, 70, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text("Autrex360", margin, 42);
+  doc.text(organization?.name || "Audit rapport", margin, 42);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("Audit · Simplified", margin, 58);
+  if (organization?.address) {
+    doc.text(organization.address, margin, 58);
+  }
 
   if (organization?.logo_url) {
     const logoDataUrl = await loadImageAsDataUrl(organization.logo_url);
@@ -87,7 +98,6 @@ export async function exportAuditToPdf(auditId) {
 
   // ── Summary ──
   heading(audit.locations?.name || audit.audit_templates?.name || "Audit", 16);
-  if (organization?.name) bodyLine("Organisatie", organization.name);
   bodyLine("Template", audit.audit_templates?.name);
   bodyLine("Datum", new Date(audit.audit_date).toLocaleDateString("nl-NL"));
   bodyLine("Auditor", audit.auditor_name);
@@ -247,7 +257,7 @@ export async function exportAuditToPdf(auditId) {
     y += 8;
   }
 
-  // ── Footer with page numbers ──
+  // ── Footer with page numbers and Autrex360 attribution ──
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -256,6 +266,7 @@ export async function exportAuditToPdf(auditId) {
     doc.setTextColor(...GREY);
     doc.text(`Pagina ${i} van ${pageCount}`, pageWidth - margin - 60, pageHeight - 24);
     doc.text(`Gegenereerd op ${new Date().toLocaleDateString("nl-NL")}`, margin, pageHeight - 24);
+    doc.text("Powered by Autrex360", pageWidth / 2 - 38, pageHeight - 24);
   }
 
   const fileName = `audit-${(audit.locations?.name || audit.audit_templates?.name || "rapport").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${audit.audit_date}.pdf`;

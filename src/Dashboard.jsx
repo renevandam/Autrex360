@@ -1261,7 +1261,7 @@ function OrganizationSettings({ profile }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [form, setForm] = useState({ name: "", address: "", qa_approval_enabled: false });
+  const [form, setForm] = useState({ name: "", address: "", qa_approval_enabled: false, primary_color: "#0B6EC1" });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const logoInputRef = useRef(null);
@@ -1271,7 +1271,7 @@ function OrganizationSettings({ profile }) {
     const { data } = await supabase.from("organizations").select("*").eq("id", profile.organization_id).single();
     if (data) {
       setOrg(data);
-      setForm({ name: data.name || "", address: data.address || "", qa_approval_enabled: !!data.qa_approval_enabled });
+      setForm({ name: data.name || "", address: data.address || "", qa_approval_enabled: !!data.qa_approval_enabled, primary_color: data.primary_color || "#0B6EC1" });
     }
     setLoading(false);
   }
@@ -1285,6 +1285,7 @@ function OrganizationSettings({ profile }) {
       name: form.name,
       address: form.address,
       qa_approval_enabled: form.qa_approval_enabled,
+      primary_color: form.primary_color,
     }).eq("id", profile.organization_id);
     setSaving(false);
     if (updateError) { setError(updateError.message); return; }
@@ -1362,6 +1363,13 @@ function OrganizationSettings({ profile }) {
 
         <div style={{ ...s.label, marginTop: 10 }}>Adres</div>
         <textarea value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Straat, postcode, plaats" />
+
+        <div style={{ ...s.label, marginTop: 10 }}>Bedrijfskleur</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <input type="color" value={form.primary_color} onChange={(e) => setForm((f) => ({ ...f, primary_color: e.target.value }))} style={{ width: 44, height: 32, border: "1px solid #ddd", borderRadius: 6, cursor: "pointer", padding: 2 }} />
+          <span style={{ fontSize: 12, color: "#888" }}>{form.primary_color}</span>
+        </div>
+        <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>Wordt gebruikt als hoofdkleur in PDF- en online rapporten.</div>
 
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: "0.5px solid #eee" }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Workflow</div>

@@ -57,7 +57,7 @@ export default function AuditReport({ auditId, onBack }) {
     </div>
   );
 
-  const { audit, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = data;
+  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = data;
 
   const actionItems = [];
   sections.forEach((sec) => sec.items.forEach((item) => {
@@ -76,6 +76,13 @@ export default function AuditReport({ auditId, onBack }) {
           <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Genereren..." : "Download PDF"}
         </button>
       </div>
+
+      {organization && (
+        <div style={{ background: organization.primary_color || "#0B6EC1", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ color: "white", fontSize: 18, fontWeight: 700 }}>{organization.name || "Audit rapport"}</div>
+          {organization.logo_url && <img src={organization.logo_url} style={{ height: 36, maxWidth: 100, objectFit: "contain" }} />}
+        </div>
+      )}
 
       <div style={s.page}>
         <div style={{ fontSize: 19, fontWeight: 700, color: "#09325A" }}>
@@ -211,7 +218,7 @@ export default function AuditReport({ auditId, onBack }) {
         </div>
       )}
 
-      <div style={{ height: 30 }} />
+      <div style={{ textAlign: "center", fontSize: 11, color: "#bbb", padding: "20px 0 30px" }}>Powered by Autrex360</div>
     </div>
   );
 }
