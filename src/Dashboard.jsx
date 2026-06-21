@@ -32,7 +32,7 @@ const OPTION_COLORS = ["#E24B4A","#E07B3A","#EF9F27","#639922","#1D9E75","#378AD
 
 const s = {
   wrap:    { fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 680, margin: "0 auto", background: "#fff", minHeight: "100vh" },
-  header:  { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between" },
+  header:  { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 },
   logo:    { fontSize: 17, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 },
   nav:     { display: "flex", borderBottom: "0.5px solid #eee", background: "#fafafa", overflowX: "auto" },
   navBtn:  (active) => ({ flexShrink: 0, padding: "10px 8px", fontSize: 11, fontWeight: 500, cursor: "pointer", background: "none", border: "none", borderBottom: active ? "2px solid #1D9E75" : "2px solid transparent", color: active ? "#1D9E75" : "#888", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }),
@@ -824,6 +824,7 @@ function Templates({ profile, canManage }) {
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
+  const [duplicatingId, setDuplicatingId] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -842,6 +843,58 @@ function Templates({ profile, canManage }) {
   async function remove(id) {
     if (!confirm("Template verwijderen?")) return;
     await supabase.from("audit_templates").delete().eq("id", id); await load();
+  }
+
+  async function duplicateTemplate(tpl) {
+    setDuplicatingId(tpl.id);
+    try {
+      // 1. Copy the template itself
+      const { data: newTpl, error: tplError } = await supabase.from("audit_templates").insert([{
+        name: `${tpl.name} (kopie)`,
+        description: tpl.description,
+        organization_id: tpl.organization_id,
+        is_active: tpl.is_active,
+        requires_location: tpl.requires_location,
+      }]).select().single();
+      if (tplError || !newTpl) throw tplError || new Error("Kon template niet aanmaken");
+
+      // 2. Copy all sections, keeping a map of old->new section id so items can be re-linked
+      const { data: oldSections } = await supabase.from("template_sections").select("*").eq("template_id", tpl.id).order("sort_order");
+      const sectionIdMap = {};
+      for (const sec of oldSections || []) {
+        const { data: newSec } = await supabase.from("template_sections").insert([{
+          template_id: newTpl.id, name: sec.name, sort_order: sec.sort_order,
+        }]).select().single();
+        if (newSec) sectionIdMap[sec.id] = newSec.id;
+      }
+
+      // 3. Copy all items per section, re-linking section_id and depends_on_item_id
+      const oldSectionIds = (oldSections || []).map((s) => s.id);
+      const { data: oldItems } = oldSectionIds.length
+        ? await supabase.from("template_items").select("*").in("section_id", oldSectionIds).order("sort_order")
+        : { data: [] };
+      const itemIdMap = {};
+      // Insert items first without depends_on_item_id (target might not exist yet), then patch it in a second pass
+      for (const item of oldItems || []) {
+        const { id, section_id, depends_on_item_id, answer_sets, ...rest } = item;
+        const { data: newItem } = await supabase.from("template_items").insert([{
+          ...rest,
+          section_id: sectionIdMap[section_id],
+        }]).select().single();
+        if (newItem) itemIdMap[item.id] = newItem.id;
+      }
+      // Second pass: fix up depends_on_item_id references to point at the new copied items
+      for (const item of oldItems || []) {
+        if (item.depends_on_item_id && itemIdMap[item.id] && itemIdMap[item.depends_on_item_id]) {
+          await supabase.from("template_items").update({ depends_on_item_id: itemIdMap[item.depends_on_item_id] }).eq("id", itemIdMap[item.id]);
+        }
+      }
+
+      await load();
+    } catch (e) {
+      alert("Dupliceren is mislukt: " + (e.message || "onbekende fout"));
+    }
+    setDuplicatingId(null);
   }
 
   if (selected) return <TemplateDetail template={selected} canManage={canManage} onBack={() => { setSelected(null); load(); }} />;
@@ -903,6 +956,11 @@ function Templates({ profile, canManage }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {canManage && (
+                  <button onClick={(e) => { e.stopPropagation(); duplicateTemplate(tpl); }} disabled={duplicatingId === tpl.id} style={{ fontSize: 11, color: "#378ADD", border: "none", background: "none", cursor: duplicatingId === tpl.id ? "not-allowed" : "pointer" }} title="Dupliceren">
+                    <i className={`ti ${duplicatingId === tpl.id ? "ti-loader-2" : "ti-copy"}`} />
+                  </button>
+                )}
                 {canManage && <button onClick={(e) => { e.stopPropagation(); remove(tpl.id); }} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
                 <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />
               </div>
@@ -1343,13 +1401,13 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
     <div style={s.wrap}>
       <div style={s.header}>
         <div style={s.logo}><i className="ti ti-clipboard-check" style={{ color: "#1D9E75" }} /> Autrex360</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, color: "#888" }}>{session.user.email}</span>
-          {profile?.role && <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C" }}>{ROLE_LABEL[profile.role] || profile.role}</span>}
-          <button onClick={() => setShowPasswordModal(true)} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }} title="Wachtwoord wijzigen">
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <span style={{ fontSize: 11, color: "#888", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user.email}</span>
+          {profile?.role && <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C", flexShrink: 0 }}>{ROLE_LABEL[profile.role] || profile.role}</span>}
+          <button onClick={() => setShowPasswordModal(true)} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer", flexShrink: 0 }} title="Wachtwoord wijzigen">
             <i className="ti ti-key" />
           </button>
-          <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer" }}>Uitloggen</button>
+          <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer", flexShrink: 0 }}>Uitloggen</button>
         </div>
       </div>
       {showPasswordModal && <ChangePasswordModal email={session.user.email} onClose={() => setShowPasswordModal(false)} />}
