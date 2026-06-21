@@ -154,7 +154,7 @@ function Locations({ profile, canManage }) {
           </div>
         </div>
       )}
-      {loading ? <div style={s.empty}>Laden...</div>
+      {loading ? <div style={s.empty}>Loading...</div>
         : visibleLocations.length === 0 ? <div style={s.empty}><i className="ti ti-building-warehouse" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "No locations found for this search." : "No locations yet."}</div>
         : visibleLocations.map((loc) => (
           <div key={loc.id} style={s.card}>
@@ -231,7 +231,7 @@ function AnswerSetDetail({ set, canManage, onBack }) {
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 16, marginTop: 4 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#555" }}>
           <input type="checkbox" checked={data.is_action_item} onChange={(e) => setData((f) => ({ ...f, is_action_item: e.target.checked }))} style={{ accentColor: "#E24B4A" }} />
-          Actiepunt (Immediate Action)
+          Action item (Immediate Action)
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#555" }}>
           <input type="checkbox" checked={data.is_na} onChange={(e) => setData((f) => ({ ...f, is_na: e.target.checked }))} style={{ accentColor: "#378ADD" }} />
@@ -246,10 +246,10 @@ function AnswerSetDetail({ set, canManage, onBack }) {
       <button style={s.backBtn} onClick={onBack}><i className="ti ti-arrow-left" /> All answer sets</button>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 600 }}>{set.name}</div>
-        <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Beheer de opties in deze antwoordset</div>
+        <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Manage the options in this answer set</div>
       </div>
 
-      {loading ? <div style={s.empty}>Laden...</div> : (
+      {loading ? <div style={s.empty}>Loading...</div> : (
         <div style={s.card}>
           {options.length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0 10px" }}>No options yet. Add the first one!</div>}
           {options.map((opt, idx) => (
@@ -316,7 +316,7 @@ function AnswerSetDetail({ set, canManage, onBack }) {
                 <FlagCheckboxes data={form} setData={setForm} />
               </div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                <button style={s.btn(true)} onClick={addOption}><i className="ti ti-check" /> Toevoegen</button>
+                <button style={s.btn(true)} onClick={addOption}><i className="ti ti-check" /> Add</button>
                 <button style={s.btn(false)} onClick={() => setAdding(false)}>Cancel</button>
               </div>
             </div>
@@ -399,7 +399,7 @@ function AnswerSets({ profile, canManage }) {
         </div>
       )}
 
-      {loading ? <div style={s.empty}>Laden...</div>
+      {loading ? <div style={s.empty}>Loading...</div>
         : sets.length === 0 ? (
           <div style={s.empty}>
             <i className="ti ti-list-check" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />
@@ -412,7 +412,7 @@ function AnswerSets({ profile, canManage }) {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{set.name}</div>
                 <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>
-                  {set.answer_options?.[0]?.count || 0} opties
+                  {set.answer_options?.[0]?.count || 0} options
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -612,7 +612,7 @@ function TemplateDetail({ template, canManage, onBack }) {
         )}
       </div>
 
-      {loading ? <div style={s.empty}>Laden...</div> : (
+      {loading ? <div style={s.empty}>Loading...</div> : (
         <>
           {sections.map((section, secIdx) => (
             <div key={section.id} style={{ ...s.card, marginBottom: 14 }}>
@@ -642,7 +642,7 @@ function TemplateDetail({ template, canManage, onBack }) {
                       </select>
                       {editForm.answer_type === "score" && (
                         <>
-                          <div style={{ ...s.label, marginTop: 8 }}>Antwoordset</div>
+                          <div style={{ ...s.label, marginTop: 8 }}>Answer set</div>
                           <select value={editForm.answer_set_id} onChange={(e) => setEditForm((f) => ({ ...f, answer_set_id: e.target.value }))} style={s.select}>
                             <option value="">— Choose an answer set —</option>
                             {answerSets.map((as) => <option key={as.id} value={as.id}>{as.name}</option>)}
@@ -740,7 +740,7 @@ function TemplateDetail({ template, canManage, onBack }) {
                   </select>
                   {(newItemForms[section.id]?.answer_type === "score" || !newItemForms[section.id]?.answer_type) && (
                     <>
-                      <div style={{ ...s.label, marginTop: 8 }}>Antwoordset</div>
+                      <div style={{ ...s.label, marginTop: 8 }}>Answer set</div>
                       <select value={newItemForms[section.id]?.answer_set_id || ""} onChange={(e) => updateItemForm(section.id, "answer_set_id", e.target.value)} style={s.select}>
                         <option value="">— Choose an answer set —</option>
                         {answerSets.map((as) => <option key={as.id} value={as.id}>{as.name}</option>)}
@@ -786,7 +786,7 @@ function TemplateDetail({ template, canManage, onBack }) {
                     </>
                   )}
                   <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                    <button style={s.btn(true)} onClick={() => addItem(section.id)}><i className="ti ti-check" /> Toevoegen</button>
+                    <button style={s.btn(true)} onClick={() => addItem(section.id)}><i className="ti ti-check" /> Add</button>
                     <button style={s.btn(false)} onClick={() => toggleItemForm(section.id)}>Cancel</button>
                   </div>
                 </div>
@@ -803,7 +803,7 @@ function TemplateDetail({ template, canManage, onBack }) {
               <div style={s.label}>Section name</div>
               <input value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} style={s.input} placeholder="e.g. Racking & Storage" autoFocus />
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                <button style={s.btn(true)} onClick={addSection}><i className="ti ti-check" /> Toevoegen</button>
+                <button style={s.btn(true)} onClick={addSection}><i className="ti ti-check" /> Add</button>
                 <button style={s.btn(false)} onClick={() => { setAddingSection(false); setNewSectionName(""); }}>Cancel</button>
               </div>
             </div>
@@ -943,7 +943,7 @@ function Templates({ profile, canManage }) {
           </div>
         </div>
       )}
-      {loading ? <div style={s.empty}>Laden...</div>
+      {loading ? <div style={s.empty}>Loading...</div>
         : visibleTemplates.length === 0 ? <div style={s.empty}><i className="ti ti-file-description" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "No templates found for this search." : "No templates yet."}</div>
         : visibleTemplates.map((tpl) => (
           <div key={tpl.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => setSelected(tpl)}>
@@ -1120,7 +1120,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
           placeholder="Search by template or location..."
         />
       </div>
-      {loading ? <div style={s.empty}>Laden...</div>
+      {loading ? <div style={s.empty}>Loading...</div>
         : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "No archived audits." : search.trim() || statusFilter !== "all" ? "No audits found for these filter(s)." : "No audits yet."}</div>
         : visibleAudits.map((audit) => (
           <div
@@ -1204,7 +1204,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
                   <button style={s.btn(true)} onClick={() => { navigator.clipboard.writeText(generatedLink); }}>
                     <i className="ti ti-copy" /> Copy
                   </button>
-                  <button style={s.btn(false)} onClick={() => setLinkModal(null)}>Sluiten</button>
+                  <button style={s.btn(false)} onClick={() => setLinkModal(null)}>Close</button>
                 </div>
               </>
             )}
@@ -1273,7 +1273,7 @@ function ChangePasswordModal({ email, onClose }) {
         {success ? (
           <>
             <div style={{ fontSize: 13, color: "#1D9E75", marginBottom: 16 }}><i className="ti ti-circle-check" /> Password successfully changed.</div>
-            <button style={s.btn(true)} onClick={onClose}>Sluiten</button>
+            <button style={s.btn(true)} onClick={onClose}>Close</button>
           </>
         ) : (
           <>
@@ -1368,7 +1368,7 @@ function OrganizationSettings({ profile }) {
     setUploadingLogo(false);
   }
 
-  if (loading) return <div style={s.empty}>Laden...</div>;
+  if (loading) return <div style={s.empty}>Loading...</div>;
 
   return (
     <div style={s.page}>
@@ -1574,7 +1574,7 @@ function Users({ profile, session }) {
         </div>
       )}
 
-      {loading ? <div style={s.empty}>Laden...</div>
+      {loading ? <div style={s.empty}>Loading...</div>
         : users.length === 0 ? <div style={s.empty}><i className="ti ti-users" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />No users yet.</div>
         : users.map((u) => (
           <div key={u.id} style={s.card}>
