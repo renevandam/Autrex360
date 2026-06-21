@@ -1075,7 +1075,11 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
 
   const visibleAudits = audits
     .filter((a) => !!a.archived === showArchived)
-    .filter((a) => !search.trim() || (a.audit_templates?.name || "").toLowerCase().includes(search.trim().toLowerCase()))
+    .filter((a) => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      return (a.audit_templates?.name || "").toLowerCase().includes(q) || (a.locations?.name || "").toLowerCase().includes(q);
+    })
     .filter(matchesStatusFilter);
 
   return (
@@ -1113,7 +1117,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...s.input, paddingLeft: 32 }}
-          placeholder="Zoek op templatenaam..."
+          placeholder="Zoek op template of locatie..."
         />
       </div>
       {loading ? <div style={s.empty}>Laden...</div>
