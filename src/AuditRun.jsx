@@ -829,7 +829,7 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
                     onChange={(val) => setResponse(item.id, val)}
                   />
                 )}
-                {item.answer_type !== "signature" && item.answer_type !== "stock_take" && (
+                {item.answer_type !== "signature" && item.answer_type !== "stock_take" && item.answer_type !== "datetime" && (
                   photos[item.id]
                     ? <div style={{ fontSize:11,color:"#0F6E56",marginTop:6,display:"flex",alignItems:"center",gap:4 }}><i className="ti ti-photo-check" /> 1 foto toegevoegd</div>
                     : <button style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#888",border:"0.5px dashed #ccc",borderRadius:6,padding:"4px 8px",background:"none",cursor:"pointer",marginTop:6 }} onClick={()=>setPhotos((p)=>({...p,[item.id]:true}))}><i className="ti ti-camera" /> Foto toevoegen</button>
