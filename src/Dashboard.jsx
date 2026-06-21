@@ -1292,10 +1292,21 @@ function OrganizationSettings({ profile }) {
     await load();
   }
 
+  const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml"];
+  const MAX_LOGO_SIZE = 2 * 1024 * 1024; // 2 MB
+
   async function handleLogoUpload(file) {
     if (!file) return;
-    setUploadingLogo(true);
     setError(null);
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      setError("Alleen PNG, JPG of SVG-bestanden zijn toegestaan voor het logo.");
+      return;
+    }
+    if (file.size > MAX_LOGO_SIZE) {
+      setError("Het logo mag maximaal 2 MB zijn.");
+      return;
+    }
+    setUploadingLogo(true);
     try {
       const ext = file.name?.split(".").pop() || "png";
       const path = `${profile.organization_id}/logo-${Date.now()}.${ext}`;
@@ -1329,7 +1340,7 @@ function OrganizationSettings({ profile }) {
 
       <div style={s.card}>
         <div style={s.label}>Logo</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
           {org?.logo_url ? (
             <img src={org.logo_url} style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 8, border: "1px solid #eee", background: "#fafafa" }} />
           ) : (
@@ -1340,7 +1351,10 @@ function OrganizationSettings({ profile }) {
           <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={s.btn(false)}>
             <i className="ti ti-upload" /> {uploadingLogo ? "Uploaden..." : "Logo uploaden"}
           </button>
-          <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { handleLogoUpload(e.target.files[0]); e.target.value = ""; }} />
+          <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml" style={{ display: "none" }} onChange={(e) => { handleLogoUpload(e.target.files[0]); e.target.value = ""; }} />
+        </div>
+        <div style={{ fontSize: 11, color: "#aaa", marginBottom: 14 }}>
+          PNG, JPG of SVG, max. 2 MB. Let op: een SVG-logo wordt wel getoond in de app, maar kan niet worden ingebed in het PDF-rapport — gebruik voor PDF-weergave bij voorkeur PNG of JPG.
         </div>
 
         <div style={s.label}>Bedrijfsnaam</div>
