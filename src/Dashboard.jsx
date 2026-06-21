@@ -4,29 +4,29 @@ import { exportAuditToPdf } from "./lib/exportPdf";
 
 const NAV = [
   { id: "home",       label: "Dashboard",   icon: "ti-home" },
-  { id: "locations",  label: "Locaties",    icon: "ti-building-warehouse" },
-  { id: "answersets", label: "Antwoordsets", icon: "ti-list-check" },
+  { id: "locations",  label: "Locations",   icon: "ti-building-warehouse" },
+  { id: "answersets", label: "Answer Sets", icon: "ti-list-check" },
   { id: "templates",  label: "Templates",   icon: "ti-file-description" },
   { id: "audits",     label: "Audits",      icon: "ti-clipboard-check" },
-  { id: "users",      label: "Gebruikers",  icon: "ti-users" },
-  { id: "org",        label: "Organisatie", icon: "ti-building" },
+  { id: "users",      label: "Users",       icon: "ti-users" },
+  { id: "org",        label: "Organization",icon: "ti-building" },
 ];
 
 const ANSWER_TYPES = [
-  { value: "score",      label: "Antwoordset" },
+  { value: "score",      label: "Answer set" },
   { value: "checkbox",   label: "Checkbox" },
-  { value: "number",     label: "Getal" },
-  { value: "text",       label: "Tekst" },
+  { value: "number",     label: "Number" },
+  { value: "text",       label: "Text" },
   { value: "slider",     label: "Slider (0-100%)" },
-  { value: "signature",  label: "Handtekening" },
-  { value: "stock_take", label: "Stock take (tabel)" },
-  { value: "datetime",   label: "Datum/Tijd" },
+  { value: "signature",  label: "Signature" },
+  { value: "stock_take", label: "Stock take (table)" },
+  { value: "datetime",   label: "Date/Time" },
 ];
 
 const DATETIME_MODES = [
-  { value: "date",     label: "Datum" },
-  { value: "time",     label: "Tijd" },
-  { value: "datetime", label: "Datum en tijd" },
+  { value: "date",     label: "Date" },
+  { value: "time",     label: "Time" },
+  { value: "datetime", label: "Date and time" },
 ];
 
 const OPTION_COLORS = ["#E24B4A","#E07B3A","#EF9F27","#639922","#1D9E75","#378ADD","#888"];
@@ -57,12 +57,12 @@ function Home({ onNav, locCount, tplCount, auditCount, onNewAudit }) {
   return (
     <div style={s.page}>
       <div style={{ marginBottom: "1.5rem" }}>
-        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Welkom terug 👋</div>
-        <div style={{ fontSize: 13, color: "#888" }}>Hier is een overzicht van je Autrex360 omgeving.</div>
+        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Welcome back 👋</div>
+        <div style={{ fontSize: 13, color: "#888" }}>Here's an overview of your Autrex360 environment.</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: "1.5rem" }}>
         {[
-          { label: "Locaties", count: locCount, icon: "ti-building-warehouse", color: "#378ADD", nav: "locations" },
+          { label: "Locations", count: locCount, icon: "ti-building-warehouse", color: "#378ADD", nav: "locations" },
           { label: "Templates", count: tplCount, icon: "ti-file-description", color: "#EF9F27", nav: "templates" },
           { label: "Audits", count: auditCount, icon: "ti-clipboard-list", color: "#1D9E75", nav: "audits" },
         ].map((item) => (
@@ -74,8 +74,8 @@ function Home({ onNav, locCount, tplCount, auditCount, onNewAudit }) {
         ))}
       </div>
       <div style={s.card}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Snel starten</div>
-        <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> Nieuwe audit starten</button>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Quick start</div>
+        <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> Start new audit</button>
       </div>
     </div>
   );
@@ -107,7 +107,7 @@ function Locations({ profile, canManage }) {
     setSaving(false);
   }
   async function remove(id) {
-    if (!confirm("Locatie verwijderen?")) return;
+    if (!confirm("Delete this location?")) return;
     await supabase.from("locations").delete().eq("id", id);
     await load();
   }
@@ -121,10 +121,10 @@ function Locations({ profile, canManage }) {
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
-        <span>Locaties ({visibleLocations.length})</span>
+        <span>Locations ({visibleLocations.length})</span>
         {canManage && (
           <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Close" : "Add"}
           </button>
         )}
       </div>
@@ -134,14 +134,14 @@ function Locations({ profile, canManage }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...s.input, paddingLeft: 32 }}
-          placeholder="Zoek op naam of stad..."
+          placeholder="Search by name or city..."
         />
       </div>
       {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>Nieuwe locatie</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>New location</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {[["Bedrijfsnaam *","name"],["Straat & huisnummer","street"],["Postcode","postal_code"],["Stad","city"],["Locatiedetail","location_detail"],["Contactpersoon","contact_name"],["E-mail contactpersoon","contact_email"]].map(([lbl, key]) => (
+            {[["Company name *","name"],["Street & number","street"],["Postal code","postal_code"],["City","city"],["Location detail","location_detail"],["Contact person","contact_name"],["Contact email","contact_email"]].map(([lbl, key]) => (
               <div key={key} style={key === "name" || key === "contact_email" ? { gridColumn: "1 / -1" } : {}}>
                 <div style={s.label}>{lbl}</div>
                 <input value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} style={s.input} />
@@ -149,13 +149,13 @@ function Locations({ profile, canManage }) {
             ))}
           </div>
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-            <button style={s.btn(true)} onClick={save} disabled={!form.name || saving}><i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}</button>
-            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Annuleren</button>
+            <button style={s.btn(true)} onClick={save} disabled={!form.name || saving}><i className="ti ti-check" /> {saving ? "Saving..." : "Save"}</button>
+            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Cancel</button>
           </div>
         </div>
       )}
       {loading ? <div style={s.empty}>Laden...</div>
-        : visibleLocations.length === 0 ? <div style={s.empty}><i className="ti ti-building-warehouse" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "Geen locaties gevonden voor deze zoekterm." : "Nog geen locaties."}</div>
+        : visibleLocations.length === 0 ? <div style={s.empty}><i className="ti ti-building-warehouse" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "No locations found for this search." : "No locations yet."}</div>
         : visibleLocations.map((loc) => (
           <div key={loc.id} style={s.card}>
             <div style={s.row}>
@@ -235,7 +235,7 @@ function AnswerSetDetail({ set, canManage, onBack }) {
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#555" }}>
           <input type="checkbox" checked={data.is_na} onChange={(e) => setData((f) => ({ ...f, is_na: e.target.checked }))} style={{ accentColor: "#378ADD" }} />
-          Telt niet mee (N/A)
+          Doesn't count (N/A)
         </label>
       </div>
     );
@@ -243,7 +243,7 @@ function AnswerSetDetail({ set, canManage, onBack }) {
 
   return (
     <div style={s.page}>
-      <button style={s.backBtn} onClick={onBack}><i className="ti ti-arrow-left" /> Alle antwoordsets</button>
+      <button style={s.backBtn} onClick={onBack}><i className="ti ti-arrow-left" /> All answer sets</button>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 600 }}>{set.name}</div>
         <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Beheer de opties in deze antwoordset</div>
@@ -251,7 +251,7 @@ function AnswerSetDetail({ set, canManage, onBack }) {
 
       {loading ? <div style={s.empty}>Laden...</div> : (
         <div style={s.card}>
-          {options.length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0 10px" }}>Nog geen opties. Voeg de eerste toe!</div>}
+          {options.length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0 10px" }}>No options yet. Add the first one!</div>}
           {options.map((opt, idx) => (
             editingId === opt.id ? (
               <div key={opt.id} style={{ marginTop: idx === 0 ? 0 : 8, marginBottom: 8, background: "white", border: "1px solid #1D9E75", borderRadius: 8, padding: 10 }}>
@@ -261,11 +261,11 @@ function AnswerSetDetail({ set, canManage, onBack }) {
                     <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
                   </div>
                   <div>
-                    <div style={s.label}>Score {editForm.is_na && "(uitgeschakeld - N/A)"}</div>
-                    <input type="number" disabled={editForm.is_na} value={editForm.score} onChange={(e) => setEditForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: editForm.is_na ? 0.5 : 1 }} placeholder="bijv. 3" />
+                    <div style={s.label}>Score {editForm.is_na && "(disabled - N/A)"}</div>
+                    <input type="number" disabled={editForm.is_na} value={editForm.score} onChange={(e) => setEditForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: editForm.is_na ? 0.5 : 1 }} placeholder="e.g. 3" />
                   </div>
                   <div>
-                    <div style={s.label}>Kleur</div>
+                    <div style={s.label}>Color</div>
                     <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                       {OPTION_COLORS.map((c) => (
                         <div key={c} onClick={() => setEditForm((f) => ({ ...f, color: c }))} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: editForm.color === c ? "2.5px solid #333" : "2px solid transparent" }} />
@@ -275,8 +275,8 @@ function AnswerSetDetail({ set, canManage, onBack }) {
                   <FlagCheckboxes data={editForm} setData={setEditForm} />
                 </div>
                 <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                  <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Opslaan</button>
-                  <button style={s.btn(false)} onClick={cancelEdit}>Annuleren</button>
+                  <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Save</button>
+                  <button style={s.btn(false)} onClick={cancelEdit}>Cancel</button>
                 </div>
               </div>
             ) : (
@@ -285,7 +285,7 @@ function AnswerSetDetail({ set, canManage, onBack }) {
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</span>
                   {opt.score !== null && <span style={{ fontSize: 11, color: "#aaa", marginLeft: 8 }}>{opt.score} pt</span>}
-                  {opt.is_action_item && <span style={{ fontSize: 10, marginLeft: 6, padding: "1px 6px", borderRadius: 8, background: "#FCEBEB", color: "#A32D2D", fontWeight: 500 }}>Actiepunt</span>}
+                  {opt.is_action_item && <span style={{ fontSize: 10, marginLeft: 6, padding: "1px 6px", borderRadius: 8, background: "#FCEBEB", color: "#A32D2D", fontWeight: 500 }}>Action item</span>}
                   {opt.is_na && <span style={{ fontSize: 10, marginLeft: 6, padding: "1px 6px", borderRadius: 8, background: "#E6F1FB", color: "#0C447C", fontWeight: 500 }}>N/A</span>}
                 </div>
                 {canManage && <button onClick={() => startEdit(opt)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>}
@@ -299,14 +299,14 @@ function AnswerSetDetail({ set, canManage, onBack }) {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ gridColumn: "1 / -1" }}>
                   <div style={s.label}>Label *</div>
-                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={s.input} placeholder="bijv. Satisfactory" autoFocus />
+                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={s.input} placeholder="e.g. Satisfactory" autoFocus />
                 </div>
                 <div>
-                  <div style={s.label}>Score {form.is_na && "(uitgeschakeld - N/A)"}</div>
-                  <input type="number" disabled={form.is_na} value={form.score} onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: form.is_na ? 0.5 : 1 }} placeholder="bijv. 3" />
+                  <div style={s.label}>Score {form.is_na && "(disabled - N/A)"}</div>
+                  <input type="number" disabled={form.is_na} value={form.score} onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: form.is_na ? 0.5 : 1 }} placeholder="e.g. 3" />
                 </div>
                 <div>
-                  <div style={s.label}>Kleur</div>
+                  <div style={s.label}>Color</div>
                   <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                     {OPTION_COLORS.map((c) => (
                       <div key={c} onClick={() => setForm((f) => ({ ...f, color: c }))} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: form.color === c ? "2.5px solid #333" : "2px solid transparent" }} />
@@ -317,18 +317,18 @@ function AnswerSetDetail({ set, canManage, onBack }) {
               </div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <button style={s.btn(true)} onClick={addOption}><i className="ti ti-check" /> Toevoegen</button>
-                <button style={s.btn(false)} onClick={() => setAdding(false)}>Annuleren</button>
+                <button style={s.btn(false)} onClick={() => setAdding(false)}>Cancel</button>
               </div>
             </div>
           ) : (
-            canManage && <button style={{ ...s.btnSm, marginTop: options.length > 0 ? 10 : 0 }} onClick={() => setAdding(true)}><i className="ti ti-plus" /> Optie toevoegen</button>
+            canManage && <button style={{ ...s.btnSm, marginTop: options.length > 0 ? 10 : 0 }} onClick={() => setAdding(true)}><i className="ti ti-plus" /> Add option</button>
           )}
         </div>
       )}
 
       {options.length > 0 && (
         <div style={{ marginTop: 12, padding: "10px 12px", background: "#f9f9f9", border: "0.5px solid #eee", borderRadius: 8 }}>
-          <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>Voorbeeld</div>
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>Preview</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {options.map((opt) => (
               <span key={opt.id} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 20, border: `1.5px solid ${opt.color || "#ccc"}`, background: (opt.color || "#ccc") + "22", color: opt.color || "#555", fontWeight: 500 }}>
@@ -369,7 +369,7 @@ function AnswerSets({ profile, canManage }) {
   }
 
   async function remove(id) {
-    if (!confirm("Antwoordset verwijderen?")) return;
+    if (!confirm("Delete this answer set?")) return;
     await supabase.from("answer_sets").delete().eq("id", id);
     await load();
   }
@@ -379,22 +379,22 @@ function AnswerSets({ profile, canManage }) {
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
-        <span>Antwoordsets ({sets.length})</span>
+        <span>Answer Sets ({sets.length})</span>
         {canManage && (
           <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Close" : "Add"}
           </button>
         )}
       </div>
 
       {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: "#1D9E75" }}>Nieuwe antwoordset</div>
-          <div style={s.label}>Naam *</div>
-          <input value={name} onChange={(e) => setName(e.target.value)} style={s.input} placeholder="bijv. Compliance Score, Frequentie, Conditie" autoFocus />
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: "#1D9E75" }}>New answer set</div>
+          <div style={s.label}>Name *</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} style={s.input} placeholder="e.g. Compliance Score, Frequency, Condition" autoFocus />
           <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-            <button style={s.btn(true)} onClick={save} disabled={!name.trim() || saving}><i className="ti ti-check" /> {saving ? "Opslaan..." : "Aanmaken"}</button>
-            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Annuleren</button>
+            <button style={s.btn(true)} onClick={save} disabled={!name.trim() || saving}><i className="ti ti-check" /> {saving ? "Saving..." : "Create"}</button>
+            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Cancel</button>
           </div>
         </div>
       )}
@@ -403,8 +403,8 @@ function AnswerSets({ profile, canManage }) {
         : sets.length === 0 ? (
           <div style={s.empty}>
             <i className="ti ti-list-check" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />
-            Nog geen antwoordsets. Maak er een aan!<br />
-            <span style={{ fontSize: 11, marginTop: 4, display: "block" }}>Antwoordsets zijn herbruikbare knoppen voor je vragen.</span>
+            No answer sets yet. Create one!<br />
+            <span style={{ fontSize: 11, marginTop: 4, display: "block" }}>Answer sets are reusable buttons for your questions.</span>
           </div>
         ) : sets.map((set) => (
           <div key={set.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => setSelected(set)}>
@@ -482,7 +482,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     setNewSectionName(""); setAddingSection(false); await load();
   }
   async function removeSection(id) {
-    if (!confirm("Sectie en alle vragen verwijderen?")) return;
+    if (!confirm("Delete this section and all its questions?")) return;
     await supabase.from("template_sections").delete().eq("id", id); await load();
   }
 
@@ -538,7 +538,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     await load();
   }
   async function removeItem(id) {
-    if (!confirm("Vraag verwijderen?")) return;
+    if (!confirm("Delete this question?")) return;
     await supabase.from("template_items").delete().eq("id", id); await load();
   }
 
@@ -600,14 +600,14 @@ function TemplateDetail({ template, canManage, onBack }) {
 
   return (
     <div style={s.page}>
-      <button style={s.backBtn} onClick={onBack}><i className="ti ti-arrow-left" /> Alle templates</button>
+      <button style={s.backBtn} onClick={onBack}><i className="ti ti-arrow-left" /> All templates</button>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 600 }}>{template.name}</div>
         {template.description && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{template.description}</div>}
         {canManage && (
           <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
             <input type="checkbox" checked={requiresLocation} onChange={(e) => toggleRequiresLocation(e.target.checked)} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
-            <span style={{ fontSize: 12, color: "#555" }}>Vereist locatie bij het starten van een audit</span>
+            <span style={{ fontSize: 12, color: "#555" }}>Requires location when starting an audit</span>
           </div>
         )}
       </div>
@@ -630,13 +630,13 @@ function TemplateDetail({ template, canManage, onBack }) {
                 {(items[section.id] || []).map((item, idx) => (
                   editingItemId === item.id ? (
                     <div key={item.id} style={{ marginTop: idx === 0 ? 0 : 8, background: "white", border: "1px solid #1D9E75", borderRadius: 8, padding: 10 }}>
-                      <div style={s.label}>Vraag *</div>
+                      <div style={s.label}>Question *</div>
                       <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
-                      <div style={{ ...s.label, marginTop: 8 }}>Toelichting (optioneel)</div>
+                      <div style={{ ...s.label, marginTop: 8 }}>Description (optional)</div>
                       <input value={editForm.sub_label} onChange={(e) => setEditForm((f) => ({ ...f, sub_label: e.target.value }))} style={s.input} />
-                      <div style={{ ...s.label, marginTop: 8 }}>Info-uitleg (optioneel, via (i)-icoon)</div>
-                      <textarea value={editForm.info_text} onChange={(e) => setEditForm((f) => ({ ...f, info_text: e.target.value }))} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Extra uitleg, normverwijzing of voorbeeld dat verborgen blijft tot de auditor erop klikt" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Antwoordtype</div>
+                      <div style={{ ...s.label, marginTop: 8 }}>Info text (optional, via (i) icon)</div>
+                      <textarea value={editForm.info_text} onChange={(e) => setEditForm((f) => ({ ...f, info_text: e.target.value }))} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Extra explanation, standard reference, or example that stays hidden until the auditor clicks it" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Answer type</div>
                       <select value={editForm.answer_type} onChange={(e) => setEditForm((f) => ({ ...f, answer_type: e.target.value }))} style={s.select}>
                         {ANSWER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                       </select>
@@ -644,20 +644,20 @@ function TemplateDetail({ template, canManage, onBack }) {
                         <>
                           <div style={{ ...s.label, marginTop: 8 }}>Antwoordset</div>
                           <select value={editForm.answer_set_id} onChange={(e) => setEditForm((f) => ({ ...f, answer_set_id: e.target.value }))} style={s.select}>
-                            <option value="">— Kies een antwoordset —</option>
+                            <option value="">— Choose an answer set —</option>
                             {answerSets.map((as) => <option key={as.id} value={as.id}>{as.name}</option>)}
                           </select>
                         </>
                       )}
                       {editForm.answer_type === "stock_take" && (
                         <>
-                          <div style={{ ...s.label, marginTop: 8 }}>Kolom 1 (tekst)</div>
-                          <input value={editForm.stock_col1_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col1_label: e.target.value }))} style={s.input} placeholder="bijv. Artikelnummer" />
-                          <div style={{ ...s.label, marginTop: 8 }}>Kolom 2 (tekst)</div>
-                          <input value={editForm.stock_col2_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col2_label: e.target.value }))} style={s.input} placeholder="bijv. Binlocatie" />
-                          <div style={{ ...s.label, marginTop: 8 }}>Kolom 3 (aantal)</div>
-                          <input value={editForm.stock_col3_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col3_label: e.target.value }))} style={s.input} placeholder="bijv. Aantal" />
-                          <div style={{ ...s.label, marginTop: 8 }}>Max. aantal rijen</div>
+                          <div style={{ ...s.label, marginTop: 8 }}>Column 1 (text)</div>
+                          <input value={editForm.stock_col1_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col1_label: e.target.value }))} style={s.input} placeholder="e.g. Item number" />
+                          <div style={{ ...s.label, marginTop: 8 }}>Column 2 (text)</div>
+                          <input value={editForm.stock_col2_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col2_label: e.target.value }))} style={s.input} placeholder="e.g. Bin location" />
+                          <div style={{ ...s.label, marginTop: 8 }}>Column 3 (quantity)</div>
+                          <input value={editForm.stock_col3_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col3_label: e.target.value }))} style={s.input} placeholder="e.g. Quantity" />
+                          <div style={{ ...s.label, marginTop: 8 }}>Max. number of rows</div>
                           <input type="number" min="1" max="20" value={editForm.stock_max_rows} onChange={(e) => setEditForm((f) => ({ ...f, stock_max_rows: e.target.value }))} style={s.input} />
                         </>
                       )}
@@ -669,26 +669,26 @@ function TemplateDetail({ template, canManage, onBack }) {
                           </select>
                         </>
                       )}
-                      <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
-                      <input type="number" step="0.5" min="0.5" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} style={s.input} placeholder="1 = normaal, 2 = dubbel belang" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Alleen tonen als... (optioneel)</div>
+                      <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
+                      <input type="number" step="0.5" min="0.5" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Only show if... (optional)</div>
                       <select value={editForm.depends_on_item_id} onChange={(e) => setEditForm((f) => ({ ...f, depends_on_item_id: e.target.value, depends_on_value: "" }))} style={s.select}>
-                        <option value="">— Altijd tonen —</option>
+                        <option value="">— Always show —</option>
                         {(items[section.id] || []).filter((it) => it.id !== item.id).map((it) => <option key={it.id} value={it.id}>{it.label}</option>)}
                       </select>
                       {editForm.depends_on_item_id && (
                         <>
-                          <div style={{ ...s.label, marginTop: 8 }}>...dit antwoord gegeven is</div>
+                          <div style={{ ...s.label, marginTop: 8 }}>...this answer was given</div>
                           <select value={editForm.depends_on_value} onChange={(e) => setEditForm((f) => ({ ...f, depends_on_value: e.target.value }))} style={s.select}>
-                            <option value="">— Kies een antwoord —</option>
+                            <option value="">— Choose an answer —</option>
                             {optionsForItem(editForm.depends_on_item_id, section.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                           </select>
-                          {optionsForItem(editForm.depends_on_item_id, section.id).length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ Deze vraag heeft geen antwoordset met opties.</div>}
+                          {optionsForItem(editForm.depends_on_item_id, section.id).length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ This question has no answer set with options.</div>}
                         </>
                       )}
                       <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                        <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Opslaan</button>
-                        <button style={s.btn(false)} onClick={cancelEdit}>Annuleren</button>
+                        <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Save</button>
+                        <button style={s.btn(false)} onClick={cancelEdit}>Cancel</button>
                       </div>
                     </div>
                   ) : (
@@ -702,12 +702,12 @@ function TemplateDetail({ template, canManage, onBack }) {
                           </span>
                           {item.weight && item.weight !== 1 && (
                             <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806", fontWeight: 500 }}>
-                              Weging ×{item.weight}
+                              Weight ×{item.weight}
                             </span>
                           )}
                           {item.depends_on_item_id && (
                             <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C", fontWeight: 500 }}>
-                              <i className="ti ti-git-branch" style={{ fontSize: 10 }} /> Voorwaardelijk
+                              <i className="ti ti-git-branch" style={{ fontSize: 10 }} /> Conditional
                             </span>
                           )}
                         </div>
@@ -723,18 +723,18 @@ function TemplateDetail({ template, canManage, onBack }) {
                     </div>
                   )
                 ))}
-                {(items[section.id] || []).length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0" }}>Nog geen vragen.</div>}
+                {(items[section.id] || []).length === 0 && <div style={{ fontSize: 12, color: "#bbb", padding: "6px 0" }}>No questions yet.</div>}
               </div>
 
               {canManage && (newItemForms[section.id]?.open ? (
                 <div style={{ marginTop: 10, background: "white", border: "0.5px solid #ddd", borderRadius: 8, padding: 10 }}>
-                  <div style={s.label}>Vraag *</div>
-                  <input value={newItemForms[section.id]?.label || ""} onChange={(e) => updateItemForm(section.id, "label", e.target.value)} style={s.input} placeholder="bijv. Stellingen vrij van schade" />
-                  <div style={{ ...s.label, marginTop: 8 }}>Toelichting (optioneel)</div>
-                  <input value={newItemForms[section.id]?.sub_label || ""} onChange={(e) => updateItemForm(section.id, "sub_label", e.target.value)} style={s.input} placeholder="bijv. Geen verbogen staanders" />
-                  <div style={{ ...s.label, marginTop: 8 }}>Info-uitleg (optioneel, via (i)-icoon)</div>
-                  <textarea value={newItemForms[section.id]?.info_text || ""} onChange={(e) => updateItemForm(section.id, "info_text", e.target.value)} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Extra uitleg, normverwijzing of voorbeeld dat verborgen blijft tot de auditor erop klikt" />
-                  <div style={{ ...s.label, marginTop: 8 }}>Antwoordtype</div>
+                  <div style={s.label}>Question *</div>
+                  <input value={newItemForms[section.id]?.label || ""} onChange={(e) => updateItemForm(section.id, "label", e.target.value)} style={s.input} placeholder="e.g. Racking free of damage" />
+                  <div style={{ ...s.label, marginTop: 8 }}>Description (optional)</div>
+                  <input value={newItemForms[section.id]?.sub_label || ""} onChange={(e) => updateItemForm(section.id, "sub_label", e.target.value)} style={s.input} placeholder="e.g. No bent uprights" />
+                  <div style={{ ...s.label, marginTop: 8 }}>Info text (optional, via (i) icon)</div>
+                  <textarea value={newItemForms[section.id]?.info_text || ""} onChange={(e) => updateItemForm(section.id, "info_text", e.target.value)} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Extra explanation, standard reference, or example that stays hidden until the auditor clicks it" />
+                  <div style={{ ...s.label, marginTop: 8 }}>Answer type</div>
                   <select value={newItemForms[section.id]?.answer_type || "score"} onChange={(e) => updateItemForm(section.id, "answer_type", e.target.value)} style={s.select}>
                     {ANSWER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
@@ -742,21 +742,21 @@ function TemplateDetail({ template, canManage, onBack }) {
                     <>
                       <div style={{ ...s.label, marginTop: 8 }}>Antwoordset</div>
                       <select value={newItemForms[section.id]?.answer_set_id || ""} onChange={(e) => updateItemForm(section.id, "answer_set_id", e.target.value)} style={s.select}>
-                        <option value="">— Kies een antwoordset —</option>
+                        <option value="">— Choose an answer set —</option>
                         {answerSets.map((as) => <option key={as.id} value={as.id}>{as.name}</option>)}
                       </select>
-                      {answerSets.length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ Nog geen antwoordsets. Maak er eerst een aan bij "Antwoordsets".</div>}
+                      {answerSets.length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ No answer sets yet. Create one first under "Answer Sets".</div>}
                     </>
                   )}
                   {newItemForms[section.id]?.answer_type === "stock_take" && (
                     <>
-                      <div style={{ ...s.label, marginTop: 8 }}>Kolom 1 (tekst)</div>
-                      <input value={newItemForms[section.id]?.stock_col1_label ?? "Artikelnummer"} onChange={(e) => updateItemForm(section.id, "stock_col1_label", e.target.value)} style={s.input} placeholder="bijv. Artikelnummer" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Kolom 2 (tekst)</div>
-                      <input value={newItemForms[section.id]?.stock_col2_label ?? "Binlocatie"} onChange={(e) => updateItemForm(section.id, "stock_col2_label", e.target.value)} style={s.input} placeholder="bijv. Binlocatie" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Kolom 3 (aantal)</div>
-                      <input value={newItemForms[section.id]?.stock_col3_label ?? "Aantal"} onChange={(e) => updateItemForm(section.id, "stock_col3_label", e.target.value)} style={s.input} placeholder="bijv. Aantal" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Max. aantal rijen</div>
+                      <div style={{ ...s.label, marginTop: 8 }}>Column 1 (text)</div>
+                      <input value={newItemForms[section.id]?.stock_col1_label ?? "Artikelnummer"} onChange={(e) => updateItemForm(section.id, "stock_col1_label", e.target.value)} style={s.input} placeholder="e.g. Item number" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Column 2 (text)</div>
+                      <input value={newItemForms[section.id]?.stock_col2_label ?? "Binlocatie"} onChange={(e) => updateItemForm(section.id, "stock_col2_label", e.target.value)} style={s.input} placeholder="e.g. Bin location" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Column 3 (quantity)</div>
+                      <input value={newItemForms[section.id]?.stock_col3_label ?? "Aantal"} onChange={(e) => updateItemForm(section.id, "stock_col3_label", e.target.value)} style={s.input} placeholder="e.g. Quantity" />
+                      <div style={{ ...s.label, marginTop: 8 }}>Max. number of rows</div>
                       <input type="number" min="1" max="20" value={newItemForms[section.id]?.stock_max_rows ?? "5"} onChange={(e) => updateItemForm(section.id, "stock_max_rows", e.target.value)} style={s.input} />
                     </>
                   )}
@@ -768,47 +768,47 @@ function TemplateDetail({ template, canManage, onBack }) {
                       </select>
                     </>
                   )}
-                  <div style={{ ...s.label, marginTop: 8 }}>Weging</div>
-                  <input type="number" step="0.5" min="0.5" value={newItemForms[section.id]?.weight || "1"} onChange={(e) => updateItemForm(section.id, "weight", e.target.value)} style={s.input} placeholder="1 = normaal, 2 = dubbel belang" />
-                  <div style={{ ...s.label, marginTop: 8 }}>Alleen tonen als... (optioneel)</div>
+                  <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
+                  <input type="number" step="0.5" min="0.5" value={newItemForms[section.id]?.weight || "1"} onChange={(e) => updateItemForm(section.id, "weight", e.target.value)} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                  <div style={{ ...s.label, marginTop: 8 }}>Only show if... (optional)</div>
                   <select value={newItemForms[section.id]?.depends_on_item_id || ""} onChange={(e) => updateItemForm(section.id, "depends_on_item_id", e.target.value)} style={s.select}>
-                    <option value="">— Altijd tonen —</option>
+                    <option value="">— Always show —</option>
                     {(items[section.id] || []).map((it) => <option key={it.id} value={it.id}>{it.label}</option>)}
                   </select>
                   {newItemForms[section.id]?.depends_on_item_id && (
                     <>
-                      <div style={{ ...s.label, marginTop: 8 }}>...dit antwoord gegeven is</div>
+                      <div style={{ ...s.label, marginTop: 8 }}>...this answer was given</div>
                       <select value={newItemForms[section.id]?.depends_on_value || ""} onChange={(e) => updateItemForm(section.id, "depends_on_value", e.target.value)} style={s.select}>
-                        <option value="">— Kies een antwoord —</option>
+                        <option value="">— Choose an answer —</option>
                         {optionsForItem(newItemForms[section.id]?.depends_on_item_id, section.id).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                       </select>
-                      {optionsForItem(newItemForms[section.id]?.depends_on_item_id, section.id).length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ Deze vraag heeft geen antwoordset met opties.</div>}
+                      {optionsForItem(newItemForms[section.id]?.depends_on_item_id, section.id).length === 0 && <div style={{ fontSize: 11, color: "#BA7517", marginTop: 4 }}>⚠ This question has no answer set with options.</div>}
                     </>
                   )}
                   <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                     <button style={s.btn(true)} onClick={() => addItem(section.id)}><i className="ti ti-check" /> Toevoegen</button>
-                    <button style={s.btn(false)} onClick={() => toggleItemForm(section.id)}>Annuleren</button>
+                    <button style={s.btn(false)} onClick={() => toggleItemForm(section.id)}>Cancel</button>
                   </div>
                 </div>
               ) : (
-                <button style={{ ...s.btnSm, marginTop: 10 }} onClick={() => toggleItemForm(section.id)}><i className="ti ti-plus" /> Vraag toevoegen</button>
+                <button style={{ ...s.btnSm, marginTop: 10 }} onClick={() => toggleItemForm(section.id)}><i className="ti ti-plus" /> Add question</button>
               ))}
             </div>
           ))}
 
-          {sections.length === 0 && <div style={s.empty}><i className="ti ti-list" style={{ fontSize: 28, display: "block", marginBottom: 6 }} />Nog geen secties.</div>}
+          {sections.length === 0 && <div style={s.empty}><i className="ti ti-list" style={{ fontSize: 28, display: "block", marginBottom: 6 }} />No sections yet.</div>}
 
           {canManage && (addingSection ? (
             <div style={{ ...s.card, border: "1px solid #1D9E75" }}>
-              <div style={s.label}>Sectienaam</div>
-              <input value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} style={s.input} placeholder="bijv. Racking & Opslag" autoFocus />
+              <div style={s.label}>Section name</div>
+              <input value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} style={s.input} placeholder="e.g. Racking & Storage" autoFocus />
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <button style={s.btn(true)} onClick={addSection}><i className="ti ti-check" /> Toevoegen</button>
-                <button style={s.btn(false)} onClick={() => { setAddingSection(false); setNewSectionName(""); }}>Annuleren</button>
+                <button style={s.btn(false)} onClick={() => { setAddingSection(false); setNewSectionName(""); }}>Cancel</button>
               </div>
             </div>
           ) : (
-            <button style={s.btn(true)} onClick={() => setAddingSection(true)}><i className="ti ti-plus" /> Sectie toevoegen</button>
+            <button style={s.btn(true)} onClick={() => setAddingSection(true)}><i className="ti ti-plus" /> Add section</button>
           ))}
         </>
       )}
@@ -842,7 +842,7 @@ function Templates({ profile, canManage }) {
     await load(); setSaving(false);
   }
   async function remove(id) {
-    if (!confirm("Template verwijderen?")) return;
+    if (!confirm("Delete this template?")) return;
     await supabase.from("audit_templates").delete().eq("id", id); await load();
   }
 
@@ -857,7 +857,7 @@ function Templates({ profile, canManage }) {
         is_active: tpl.is_active,
         requires_location: tpl.requires_location,
       }]).select().single();
-      if (tplError || !newTpl) throw tplError || new Error("Kon template niet aanmaken");
+      if (tplError || !newTpl) throw tplError || new Error("Could not create template");
 
       // 2. Copy all sections, keeping a map of old->new section id so items can be re-linked
       const { data: oldSections } = await supabase.from("template_sections").select("*").eq("template_id", tpl.id).order("sort_order");
@@ -893,7 +893,7 @@ function Templates({ profile, canManage }) {
 
       await load();
     } catch (e) {
-      alert("Dupliceren is mislukt: " + (e.message || "onbekende fout"));
+      alert("Duplication failed: " + (e.message || "unknown error"));
     }
     setDuplicatingId(null);
   }
@@ -908,7 +908,7 @@ function Templates({ profile, canManage }) {
         <span>Templates ({visibleTemplates.length})</span>
         {canManage && (
           <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Close" : "Add"}
           </button>
         )}
       </div>
@@ -918,33 +918,33 @@ function Templates({ profile, canManage }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...s.input, paddingLeft: 32 }}
-          placeholder="Zoek op templatenaam..."
+          placeholder="Search by template name..."
         />
       </div>
       {showForm && canManage && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>Nieuw template</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>New template</div>
           <div style={{ marginBottom: 10 }}>
-            <div style={s.label}>Naam *</div>
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={s.input} placeholder="bijv. Warehouse Compliance Q3" />
+            <div style={s.label}>Name *</div>
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={s.input} placeholder="e.g. Warehouse Compliance Q3" />
           </div>
           <div>
-            <div style={s.label}>Omschrijving</div>
-            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} style={s.input} placeholder="Optionele toelichting" />
+            <div style={s.label}>Description</div>
+            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} style={s.input} placeholder="Optional description" />
           </div>
           <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
             <input type="checkbox" checked={form.requires_location} onChange={(e) => setForm((f) => ({ ...f, requires_location: e.target.checked }))} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
-            <span style={{ fontSize: 12, color: "#555" }}>Vereist locatie bij het starten van een audit</span>
+            <span style={{ fontSize: 12, color: "#555" }}>Requires location when starting an audit</span>
           </div>
-          <div style={{ fontSize: 11, color: "#aaa", marginTop: 3, marginLeft: 23 }}>Zet uit voor interne checklists die niet aan een specifieke locatie gebonden zijn.</div>
+          <div style={{ fontSize: 11, color: "#aaa", marginTop: 3, marginLeft: 23 }}>Turn off for internal checklists that aren't tied to a specific location.</div>
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-            <button style={s.btn(true)} onClick={save} disabled={!form.name || saving}><i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}</button>
-            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Annuleren</button>
+            <button style={s.btn(true)} onClick={save} disabled={!form.name || saving}><i className="ti ti-check" /> {saving ? "Saving..." : "Save"}</button>
+            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Cancel</button>
           </div>
         </div>
       )}
       {loading ? <div style={s.empty}>Laden...</div>
-        : visibleTemplates.length === 0 ? <div style={s.empty}><i className="ti ti-file-description" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "Geen templates gevonden voor deze zoekterm." : "Nog geen templates."}</div>
+        : visibleTemplates.length === 0 ? <div style={s.empty}><i className="ti ti-file-description" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "No templates found for this search." : "No templates yet."}</div>
         : visibleTemplates.map((tpl) => (
           <div key={tpl.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => setSelected(tpl)}>
             <div style={s.row}>
@@ -952,13 +952,13 @@ function Templates({ profile, canManage }) {
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{tpl.name}</div>
                 {tpl.description && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{tpl.description}</div>}
                 <div style={{ marginTop: 6 }}>
-                  <span style={s.badge(tpl.is_active ? "#1D9E75" : "#aaa")}>{tpl.is_active ? "Actief" : "Inactief"}</span>
-                  {tpl.requires_location === false && <span style={s.badge("#888")}>Geen locatie</span>}
+                  <span style={s.badge(tpl.is_active ? "#1D9E75" : "#aaa")}>{tpl.is_active ? "Active" : "Inactive"}</span>
+                  {tpl.requires_location === false && <span style={s.badge("#888")}>No location</span>}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {canManage && (
-                  <button onClick={(e) => { e.stopPropagation(); duplicateTemplate(tpl); }} disabled={duplicatingId === tpl.id} style={{ fontSize: 11, color: "#378ADD", border: "none", background: "none", cursor: duplicatingId === tpl.id ? "not-allowed" : "pointer" }} title="Dupliceren">
+                  <button onClick={(e) => { e.stopPropagation(); duplicateTemplate(tpl); }} disabled={duplicatingId === tpl.id} style={{ fontSize: 11, color: "#378ADD", border: "none", background: "none", cursor: duplicatingId === tpl.id ? "not-allowed" : "pointer" }} title="Duplicate">
                     <i className={`ti ${duplicatingId === tpl.id ? "ti-loader-2" : "ti-copy"}`} />
                   </button>
                 )}
@@ -1017,13 +1017,13 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
     try {
       await exportAuditToPdf(id);
     } catch (e) {
-      alert("Kon de PDF niet genereren: " + e.message);
+      alert("Could not generate PDF: " + e.message);
     }
     setExportingId(null);
   }
 
   async function remove(id) {
-    if (!confirm("Deze audit en alle bijbehorende antwoorden permanent verwijderen?")) return;
+    if (!confirm("Permanently delete this audit and all its responses?")) return;
     await supabase.from("audit_responses").delete().eq("audit_id", id);
     await supabase.from("stock_checks").delete().eq("audit_id", id);
     await supabase.from("signatures").delete().eq("audit_id", id);
@@ -1052,17 +1052,17 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
   }
 
   const statusColor = { draft: "#EF9F27", submitted: "#1D9E75" };
-  const statusLabel = { draft: "Concept", submitted: "Ingediend" };
+  const statusLabel = { draft: "Draft", submitted: "Submitted" };
   const qaStatusColor = { pending: "#EF9F27", approved: "#1D9E75", rejected: "#E24B4A" };
-  const qaStatusLabel = { pending: "QA: in afwachting", approved: "QA: goedgekeurd", rejected: "QA: afgekeurd" };
+  const qaStatusLabel = { pending: "QA: pending", approved: "QA: approved", rejected: "QA: rejected" };
 
   const STATUS_FILTERS = [
-    { value: "all", label: "Alle" },
-    { value: "draft", label: "Concept" },
-    { value: "submitted", label: "Ingediend" },
-    { value: "pending", label: "QA: in afwachting" },
-    { value: "approved", label: "QA: goedgekeurd" },
-    { value: "rejected", label: "QA: afgekeurd" },
+    { value: "all", label: "All" },
+    { value: "draft", label: "Draft" },
+    { value: "submitted", label: "Submitted" },
+    { value: "pending", label: "QA: pending" },
+    { value: "approved", label: "QA: approved" },
+    { value: "rejected", label: "QA: rejected" },
   ];
 
   function matchesStatusFilter(audit) {
@@ -1088,9 +1088,9 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
         <span>Audits ({visibleAudits.length})</span>
         <div style={{ display: "flex", gap: 8 }}>
           <button style={s.btn(false)} onClick={() => setShowArchived((v) => !v)}>
-            <i className={`ti ${showArchived ? "ti-clipboard-check" : "ti-archive"}`} /> {showArchived ? "Actieve audits" : "Gearchiveerd"}
+            <i className={`ti ${showArchived ? "ti-clipboard-check" : "ti-archive"}`} /> {showArchived ? "Active audits" : "Archived"}
           </button>
-          <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> Nieuwe audit</button>
+          <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> New audit</button>
         </div>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 2 }}>
@@ -1117,11 +1117,11 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...s.input, paddingLeft: 32 }}
-          placeholder="Zoek op template of locatie..."
+          placeholder="Search by template or location..."
         />
       </div>
       {loading ? <div style={s.empty}>Laden...</div>
-        : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "Geen gearchiveerde audits." : search.trim() || statusFilter !== "all" ? "Geen audits gevonden voor deze filter(s)." : "Nog geen audits."}</div>
+        : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "No archived audits." : search.trim() || statusFilter !== "all" ? "No audits found for these filter(s)." : "No audits yet."}</div>
         : visibleAudits.map((audit) => (
           <div
             key={audit.id}
@@ -1154,21 +1154,21 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
                 {canApproveQA && audit.qa_status === "pending" && (
-                  <button onClick={() => { setQaModal({ auditId: audit.id }); setQaNote(""); }} style={{ fontSize: 12, color: "#EF9F27", border: "none", background: "none", cursor: "pointer" }} title="QA beoordelen">
+                  <button onClick={() => { setQaModal({ auditId: audit.id }); setQaNote(""); }} style={{ fontSize: 12, color: "#EF9F27", border: "none", background: "none", cursor: "pointer" }} title="QA review">
                     <i className="ti ti-clipboard-check" />
                   </button>
                 )}
-                <button onClick={() => onViewReport && onViewReport(audit.id)} style={{ fontSize: 12, color: "#1D9E75", border: "none", background: "none", cursor: "pointer" }} title="Bekijk rapport">
+                <button onClick={() => onViewReport && onViewReport(audit.id)} style={{ fontSize: 12, color: "#1D9E75", border: "none", background: "none", cursor: "pointer" }} title="View report">
                   <i className="ti ti-eye" />
                 </button>
-                <button onClick={() => { setLinkModal({ auditId: audit.id }); setLinkEmail(""); setGeneratedLink(null); }} style={{ fontSize: 12, color: "#888", border: "none", background: "none", cursor: "pointer" }} title="Genereer externe link">
+                <button onClick={() => { setLinkModal({ auditId: audit.id }); setLinkEmail(""); setGeneratedLink(null); }} style={{ fontSize: 12, color: "#888", border: "none", background: "none", cursor: "pointer" }} title="Generate external link">
                   <i className="ti ti-link" />
                 </button>
-                <button onClick={() => handleExport(audit.id)} disabled={exportingId === audit.id} style={{ fontSize: 12, color: "#378ADD", border: "none", background: "none", cursor: exportingId === audit.id ? "not-allowed" : "pointer" }} title="Exporteer als PDF">
+                <button onClick={() => handleExport(audit.id)} disabled={exportingId === audit.id} style={{ fontSize: 12, color: "#378ADD", border: "none", background: "none", cursor: exportingId === audit.id ? "not-allowed" : "pointer" }} title="Export as PDF">
                   <i className={`ti ${exportingId === audit.id ? "ti-loader-2" : "ti-file-type-pdf"}`} />
                 </button>
                 {canArchive && (
-                  <button onClick={() => toggleArchive(audit.id, !audit.archived)} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }} title={audit.archived ? "Terugzetten" : "Archiveren"}>
+                  <button onClick={() => toggleArchive(audit.id, !audit.archived)} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }} title={audit.archived ? "Restore" : "Archive"}>
                     <i className={`ti ${audit.archived ? "ti-archive-off" : "ti-archive"}`} />
                   </button>
                 )}
@@ -1183,26 +1183,26 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
       {linkModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
           <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 400 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Externe auditlink genereren</div>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>De ontvanger moet dit e-mailadres invoeren om de audit te openen.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Generate external audit link</div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>The recipient must enter this email address to open the audit.</div>
             {!generatedLink ? (
               <>
-                <div style={s.label}>E-mailadres ontvanger *</div>
-                <input type="email" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && generateLink()} style={s.input} placeholder="naam@bedrijf.nl" autoFocus />
+                <div style={s.label}>Recipient's email address *</div>
+                <input type="email" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && generateLink()} style={s.input} placeholder="name@company.com" autoFocus />
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
                   <button style={s.btn(true)} onClick={generateLink} disabled={!linkEmail.trim() || linkSaving}>
-                    <i className="ti ti-link" /> {linkSaving ? "Genereren..." : "Genereer link"}
+                    <i className="ti ti-link" /> {linkSaving ? "Generating..." : "Generate link"}
                   </button>
-                  <button style={s.btn(false)} onClick={() => setLinkModal(null)}>Annuleren</button>
+                  <button style={s.btn(false)} onClick={() => setLinkModal(null)}>Cancel</button>
                 </div>
               </>
             ) : (
               <>
-                <div style={{ fontSize: 12, color: "#1D9E75", fontWeight: 600, marginBottom: 8 }}><i className="ti ti-circle-check" /> Link gegenereerd!</div>
+                <div style={{ fontSize: 12, color: "#1D9E75", fontWeight: 600, marginBottom: 8 }}><i className="ti ti-circle-check" /> Link generated!</div>
                 <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "10px 12px", fontSize: 11, wordBreak: "break-all", color: "#333", marginBottom: 12 }}>{generatedLink}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button style={s.btn(true)} onClick={() => { navigator.clipboard.writeText(generatedLink); }}>
-                    <i className="ti ti-copy" /> Kopiëren
+                    <i className="ti ti-copy" /> Copy
                   </button>
                   <button style={s.btn(false)} onClick={() => setLinkModal(null)}>Sluiten</button>
                 </div>
@@ -1216,10 +1216,10 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
       {qaModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
           <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 400 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Audit beoordelen</div>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Keur deze audit goed of af, met een optionele notitie.</div>
-            <div style={s.label}>Notitie (optioneel)</div>
-            <textarea value={qaNote} onChange={(e) => setQaNote(e.target.value)} rows={3} style={{ ...s.input, resize: "vertical" }} placeholder="Toelichting bij je beslissing" />
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Review audit</div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Approve or reject this audit, with an optional note.</div>
+            <div style={s.label}>Note (optional)</div>
+            <textarea value={qaNote} onChange={(e) => setQaNote(e.target.value)} rows={3} style={{ ...s.input, resize: "vertical" }} placeholder="Explanation for your decision" />
             <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
               <button style={{ ...s.btn(true), background: "#1D9E75" }} onClick={() => handleQaDecision("approved")} disabled={qaSaving}>
                 <i className="ti ti-check" /> Goedkeuren
@@ -1227,7 +1227,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
               <button style={{ ...s.btn(true), background: "#E24B4A" }} onClick={() => handleQaDecision("rejected")} disabled={qaSaving}>
                 <i className="ti ti-x" /> Afkeuren
               </button>
-              <button style={s.btn(false)} onClick={() => setQaModal(null)}>Annuleren</button>
+              <button style={s.btn(false)} onClick={() => setQaModal(null)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -1248,16 +1248,16 @@ function ChangePasswordModal({ email, onClose }) {
 
   async function save() {
     setError(null);
-    if (!currentPassword) { setError("Vul je huidige wachtwoord in."); return; }
-    if (password.length < 6) { setError("Nieuw wachtwoord moet minimaal 6 tekens zijn."); return; }
-    if (password !== confirm) { setError("Wachtwoorden komen niet overeen."); return; }
+    if (!currentPassword) { setError("Enter your current password."); return; }
+    if (password.length < 6) { setError("New password must be at least 6 characters."); return; }
+    if (password !== confirm) { setError("Passwords do not match."); return; }
     setSaving(true);
     // Verify the current password by re-authenticating, since an active session
     // alone isn't proof of identity (e.g. an unattended device on the work floor)
     const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
     if (reauthError) {
       setSaving(false);
-      setError("Huidig wachtwoord is onjuist.");
+      setError("Current password is incorrect.");
       return;
     }
     const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -1269,26 +1269,26 @@ function ChangePasswordModal({ email, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
       <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 380 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 12 }}>Wachtwoord wijzigen</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 12 }}>Change password</div>
         {success ? (
           <>
-            <div style={{ fontSize: 13, color: "#1D9E75", marginBottom: 16 }}><i className="ti ti-circle-check" /> Wachtwoord succesvol gewijzigd.</div>
+            <div style={{ fontSize: 13, color: "#1D9E75", marginBottom: 16 }}><i className="ti ti-circle-check" /> Password successfully changed.</div>
             <button style={s.btn(true)} onClick={onClose}>Sluiten</button>
           </>
         ) : (
           <>
-            <div style={s.label}>Huidig wachtwoord</div>
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} style={s.input} placeholder="Je huidige wachtwoord" autoFocus />
-            <div style={{ ...s.label, marginTop: 10 }}>Nieuw wachtwoord</div>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={s.input} placeholder="Minimaal 6 tekens" />
-            <div style={{ ...s.label, marginTop: 10 }}>Bevestig nieuw wachtwoord</div>
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} style={s.input} placeholder="Herhaal nieuw wachtwoord" />
+            <div style={s.label}>Current password</div>
+            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} style={s.input} placeholder="Your current password" autoFocus />
+            <div style={{ ...s.label, marginTop: 10 }}>New password</div>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={s.input} placeholder="Minimum 6 characters" />
+            <div style={{ ...s.label, marginTop: 10 }}>Confirm new password</div>
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} style={s.input} placeholder="Repeat new password" />
             {error && <div style={{ fontSize: 12, color: "#E24B4A", marginTop: 8 }}>{error}</div>}
             <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
               <button style={s.btn(true)} onClick={save} disabled={saving || !currentPassword || !password || !confirm}>
-                <i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}
+                <i className="ti ti-check" /> {saving ? "Saving..." : "Save"}
               </button>
-              <button style={s.btn(false)} onClick={onClose}>Annuleren</button>
+              <button style={s.btn(false)} onClick={onClose}>Cancel</button>
             </div>
           </>
         )}
@@ -1342,11 +1342,11 @@ function OrganizationSettings({ profile }) {
     if (!file) return;
     setError(null);
     if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
-      setError("Alleen PNG, JPG of SVG-bestanden zijn toegestaan voor het logo.");
+      setError("Only PNG, JPG, or SVG files are allowed for the logo.");
       return;
     }
     if (file.size > MAX_LOGO_SIZE) {
-      setError("Het logo mag maximaal 2 MB zijn.");
+      setError("The logo can be a maximum of 2 MB.");
       return;
     }
     setUploadingLogo(true);
@@ -1363,7 +1363,7 @@ function OrganizationSettings({ profile }) {
       await supabase.from("organizations").update({ logo_url: urlData.publicUrl }).eq("id", profile.organization_id);
       await load();
     } catch (e) {
-      setError("Logo uploaden mislukt: " + e.message);
+      setError("Logo upload failed: " + e.message);
     }
     setUploadingLogo(false);
   }
@@ -1372,13 +1372,13 @@ function OrganizationSettings({ profile }) {
 
   return (
     <div style={s.page}>
-      <div style={s.sTitle}><span>Organisatie</span></div>
+      <div style={s.sTitle}><span>Organization</span></div>
 
       {error && (
         <div style={{ fontSize: 12, color: "#A32D2D", background: "#FCEBEB", border: "1px solid #E24B4A", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>{error}</div>
       )}
       {success && (
-        <div style={{ fontSize: 12, color: "#0F6E56", background: "#E1F5EE", border: "1px solid #1D9E75", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>Opgeslagen.</div>
+        <div style={{ fontSize: 12, color: "#0F6E56", background: "#E1F5EE", border: "1px solid #1D9E75", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>Saved.</div>
       )}
 
       <div style={s.card}>
@@ -1392,41 +1392,41 @@ function OrganizationSettings({ profile }) {
             </div>
           )}
           <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={s.btn(false)}>
-            <i className="ti ti-upload" /> {uploadingLogo ? "Uploaden..." : "Logo uploaden"}
+            <i className="ti ti-upload" /> {uploadingLogo ? "Uploading..." : "Upload logo"}
           </button>
           <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml" style={{ display: "none" }} onChange={(e) => { handleLogoUpload(e.target.files[0]); e.target.value = ""; }} />
         </div>
         <div style={{ fontSize: 11, color: "#aaa", marginBottom: 14 }}>
-          PNG, JPG of SVG, max. 2 MB. Let op: een SVG-logo wordt wel getoond in de app, maar kan niet worden ingebed in het PDF-rapport — gebruik voor PDF-weergave bij voorkeur PNG of JPG.
+          PNG, JPG, or SVG, max. 2 MB. Note: an SVG logo will show in the app, but can't be embedded in the PDF report — use PNG or JPG for PDF display.
         </div>
 
-        <div style={s.label}>Bedrijfsnaam</div>
-        <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={s.input} placeholder="bijv. Outpath Solutions" />
+        <div style={s.label}>Company name</div>
+        <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={s.input} placeholder="e.g. Outpath Solutions" />
 
-        <div style={{ ...s.label, marginTop: 10 }}>Adres</div>
-        <textarea value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Straat, postcode, plaats" />
+        <div style={{ ...s.label, marginTop: 10 }}>Address</div>
+        <textarea value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Street, postal code, city" />
 
-        <div style={{ ...s.label, marginTop: 10 }}>Bedrijfskleur</div>
+        <div style={{ ...s.label, marginTop: 10 }}>Brand color</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <input type="color" value={form.primary_color} onChange={(e) => setForm((f) => ({ ...f, primary_color: e.target.value }))} style={{ width: 44, height: 32, border: "1px solid #ddd", borderRadius: 6, cursor: "pointer", padding: 2 }} />
           <span style={{ fontSize: 12, color: "#888" }}>{form.primary_color}</span>
         </div>
-        <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>Wordt gebruikt als hoofdkleur in PDF- en online rapporten.</div>
+        <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>Used as the main color in PDF and online reports.</div>
 
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: "0.5px solid #eee" }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Workflow</div>
           <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
             <input type="checkbox" checked={form.qa_approval_enabled} onChange={(e) => setForm((f) => ({ ...f, qa_approval_enabled: e.target.checked }))} style={{ width: 15, height: 15, accentColor: "#1D9E75", marginTop: 2 }} />
             <span style={{ fontSize: 12, color: "#555" }}>
-              QA-goedkeuring vereist<br />
-              <span style={{ fontSize: 11, color: "#aaa" }}>Ingediende audits moeten eerst door een admin/manager worden goedgekeurd voordat ze definitief zijn.</span>
+              QA approval required<br />
+              <span style={{ fontSize: 11, color: "#aaa" }}>Submitted audits must first be approved by an admin/manager before they are final.</span>
             </span>
           </label>
         </div>
 
         <div style={{ marginTop: 16 }}>
           <button style={s.btn(true)} onClick={save} disabled={saving}>
-            <i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}
+            <i className="ti ti-check" /> {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -1522,7 +1522,7 @@ function Users({ profile, session }) {
   }
 
   async function removeUser(userId) {
-    if (!confirm("Deze gebruiker permanent verwijderen?")) return;
+    if (!confirm("Permanently delete this user?")) return;
     setError(null);
     try {
       const res = await fetch("/api/manage-user", {
@@ -1541,9 +1541,9 @@ function Users({ profile, session }) {
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
-        <span>Gebruikers ({users.length})</span>
+        <span>Users ({users.length})</span>
         <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-          <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Sluiten" : "Toevoegen"}
+          <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Close" : "Add"}
         </button>
       </div>
 
@@ -1555,41 +1555,41 @@ function Users({ profile, session }) {
 
       {showForm && (
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>Nieuwe gebruiker</div>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>De gebruiker ontvangt een e-mail met een beveiligde link om zelf een wachtwoord in te stellen.</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>New user</div>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>The user will receive an email with a secure link to set their own password.</div>
           <div style={s.label}>E-mailadres *</div>
-          <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={s.input} placeholder="naam@bedrijf.nl" />
-          <div style={{ ...s.label, marginTop: 8 }}>Volledige naam</div>
-          <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} style={s.input} placeholder="Optioneel" />
-          <div style={{ ...s.label, marginTop: 8 }}>Rol</div>
+          <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={s.input} placeholder="name@company.com" />
+          <div style={{ ...s.label, marginTop: 8 }}>Full name</div>
+          <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} style={s.input} placeholder="Optional" />
+          <div style={{ ...s.label, marginTop: 8 }}>Role</div>
           <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} style={s.select}>
             {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
             <button style={s.btn(true)} onClick={save} disabled={!form.email.trim() || saving}>
-              <i className="ti ti-mail" /> {saving ? "Versturen..." : "Uitnodiging versturen"}
+              <i className="ti ti-mail" /> {saving ? "Sending..." : "Send invitation"}
             </button>
-            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Annuleren</button>
+            <button style={s.btn(false)} onClick={() => setShowForm(false)}>Cancel</button>
           </div>
         </div>
       )}
 
       {loading ? <div style={s.empty}>Laden...</div>
-        : users.length === 0 ? <div style={s.empty}><i className="ti ti-users" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Nog geen gebruikers.</div>
+        : users.length === 0 ? <div style={s.empty}><i className="ti ti-users" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />No users yet.</div>
         : users.map((u) => (
           <div key={u.id} style={s.card}>
             <div style={s.row}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || u.email || "Onbekend"}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || u.email || "Unknown"}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{u.email}</div>
                 <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>
-                  <i className="ti ti-clock" style={{ fontSize: 11 }} /> Laatste login: {u.last_sign_in_at
+                  <i className="ti ti-clock" style={{ fontSize: 11 }} /> Last login: {u.last_sign_in_at
                     ? new Date(u.last_sign_in_at).toLocaleString("nl-NL", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                    : "Nog niet ingelogd"}
+                    : "Never logged in"}
                 </div>
                 {u.must_change_password && (
                   <span style={{ fontSize: 10, fontWeight: 500, display: "inline-block", marginTop: 4, padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806" }}>
-                    <i className="ti ti-clock" style={{ fontSize: 10 }} /> Uitnodiging nog niet geactiveerd
+                    <i className="ti ti-clock" style={{ fontSize: 10 }} /> Invitation not yet activated
                   </span>
                 )}
               </div>
@@ -1633,10 +1633,10 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span style={{ fontSize: 11, color: "#888", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user.email}</span>
           {profile?.role && <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C", flexShrink: 0 }}>{ROLE_LABEL[profile.role] || profile.role}</span>}
-          <button onClick={() => setShowPasswordModal(true)} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer", flexShrink: 0 }} title="Wachtwoord wijzigen">
+          <button onClick={() => setShowPasswordModal(true)} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer", flexShrink: 0 }} title="Change password">
             <i className="ti ti-key" />
           </button>
-          <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer", flexShrink: 0 }}>Uitloggen</button>
+          <button onClick={handleLogout} style={{ fontSize: 11, color: "#888", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 9px", background: "none", cursor: "pointer", flexShrink: 0 }}>Log out</button>
         </div>
       </div>
       {showPasswordModal && <ChangePasswordModal email={session.user.email} onClose={() => setShowPasswordModal(false)} />}
