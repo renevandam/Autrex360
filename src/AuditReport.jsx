@@ -28,7 +28,7 @@ export default function AuditReport({ auditId, onBack }) {
     try {
       await exportAuditToPdf(auditId);
     } catch (e) {
-      alert("Kon de PDF niet genereren: " + e.message);
+      alert("Could not generate PDF: " + e.message);
     }
     setExportingPdf(false);
   }
@@ -44,16 +44,16 @@ export default function AuditReport({ auditId, onBack }) {
 
   if (loading) return (
     <div style={{ ...s.wrap, textAlign: "center", padding: "3rem", color: "#aaa" }}>
-      <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Rapport laden...
+      <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Loading report...
     </div>
   );
 
   if (error || !data) return (
     <div style={{ ...s.wrap, textAlign: "center", padding: "3rem" }}>
       <i className="ti ti-alert-circle" style={{ fontSize: 36, color: "#E24B4A", display: "block", marginBottom: 10 }} />
-      <div style={{ fontSize: 14, fontWeight: 600 }}>Kon het rapport niet laden</div>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>Could not load the report</div>
       <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>{error}</div>
-      <button onClick={onBack} style={{ marginTop: 16, padding: "8px 16px", background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Terug</button>
+      <button onClick={onBack} style={{ marginTop: 16, padding: "8px 16px", background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Back</button>
     </div>
   );
 
@@ -70,16 +70,16 @@ export default function AuditReport({ auditId, onBack }) {
     <div style={s.wrap}>
       <div style={s.header}>
         <button onClick={onBack} style={{ fontSize: 13, color: "#1D9E75", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-          <i className="ti ti-arrow-left" /> Terug
+          <i className="ti ti-arrow-left" /> Back
         </button>
         <button onClick={handleExportPdf} disabled={exportingPdf} style={{ fontSize: 12, color: "#378ADD", border: "0.5px solid #378ADD", borderRadius: 6, padding: "5px 10px", background: "none", cursor: exportingPdf ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-          <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Genereren..." : "Download PDF"}
+          <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Generating..." : "Download PDF"}
         </button>
       </div>
 
       {organization && (
         <div style={{ background: organization.primary_color || "#0B6EC1", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ color: "white", fontSize: 18, fontWeight: 700 }}>{organization.name || "Audit rapport"}</div>
+          <div style={{ color: "white", fontSize: 18, fontWeight: 700 }}>{organization.name || "Audit report"}</div>
           {organization.logo_url && <img src={organization.logo_url} style={{ height: 36, maxWidth: 100, objectFit: "contain" }} />}
         </div>
       )}
@@ -90,7 +90,7 @@ export default function AuditReport({ auditId, onBack }) {
           {audit.locations?.name && <span style={{ color: "#aaa", fontWeight: 400 }}> – {audit.locations.name}</span>}
         </div>
         <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>
-          <i className="ti ti-calendar" style={{ fontSize: 13 }} /> {new Date(audit.audit_date).toLocaleDateString("nl-NL")}
+          <i className="ti ti-calendar" style={{ fontSize: 13 }} /> {new Date(audit.audit_date).toLocaleDateString("en-US")}
           {audit.auditor_name && <> · {audit.auditor_name}</>}
           {" · "}
           <span style={{ fontWeight: 500, color: audit.status === "submitted" ? "#1D9E75" : "#EF9F27" }}>{STATUS_LABEL[audit.status] || audit.status}</span>
@@ -101,10 +101,10 @@ export default function AuditReport({ auditId, onBack }) {
           {audit.score_pct !== null && audit.score_pct !== undefined ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
               <div style={{ fontSize: 38, fontWeight: 700, color: scoreColor }}>{audit.score_pct}%</div>
-              <div style={{ fontSize: 13, color: "#888" }}>{audit.score_achieved ?? "?"} / {audit.score_max ?? "?"} punten</div>
+              <div style={{ fontSize: 13, color: "#888" }}>{audit.score_achieved ?? "?"} / {audit.score_max ?? "?"} points</div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: "#888", fontStyle: "italic" }}>Score nog niet beschikbaar (audit is nog niet ingediend)</div>
+            <div style={{ fontSize: 13, color: "#888", fontStyle: "italic" }}>Score not yet available (audit has not been submitted yet)</div>
           )}
         </div>
 
@@ -113,7 +113,7 @@ export default function AuditReport({ auditId, onBack }) {
           <div style={{ marginTop: 18 }}>
             {(() => {
               const qaColor = audit.qa_status === "approved" ? "#1D9E75" : audit.qa_status === "rejected" ? "#E24B4A" : "#EF9F27";
-              const qaLabel = audit.qa_status === "approved" ? "QA: Goedgekeurd" : audit.qa_status === "rejected" ? "QA: Afgekeurd" : "QA: In afwachting van beoordeling";
+              const qaLabel = audit.qa_status === "approved" ? "QA: Approved" : audit.qa_status === "rejected" ? "QA: Rejected" : "QA: Pending review";
               const qaBg = audit.qa_status === "approved" ? "#E1F5EE" : audit.qa_status === "rejected" ? "#FCEBEB" : "#FAEEDA";
               return (
                 <div style={{ background: qaBg, border: `0.5px solid ${qaColor}`, borderRadius: 10, padding: "0.75rem 1rem" }}>
@@ -130,7 +130,7 @@ export default function AuditReport({ auditId, onBack }) {
           {actionItems.length > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#E24B4A", marginBottom: 8 }}>
-                <i className="ti ti-alert-triangle" /> Actiepunten ({actionItems.length})
+                <i className="ti ti-alert-triangle" /> Action items ({actionItems.length})
               </div>
               <div style={{ background: "#FCEBEB", border: "0.5px solid #E24B4A", borderRadius: 10, padding: "0.75rem 1rem" }}>
                 {actionItems.map(({ section, item }, idx) => (
@@ -141,7 +141,7 @@ export default function AuditReport({ auditId, onBack }) {
               </div>
             </>
           ) : (
-            <div style={{ fontSize: 13, color: "#1D9E75", fontStyle: "italic" }}><i className="ti ti-circle-check" /> Geen actiepunten gesignaleerd.</div>
+            <div style={{ fontSize: 13, color: "#1D9E75", fontStyle: "italic" }}><i className="ti ti-circle-check" /> No action items flagged.</div>
           )}
         </div>
       </div>
@@ -152,7 +152,7 @@ export default function AuditReport({ auditId, onBack }) {
           <div style={s.secTitle}><i className="ti ti-list" /> {section.name}</div>
           <div style={s.card}>
             {section.items.length === 0 ? (
-              <div style={{ fontSize: 12, color: "#aaa", fontStyle: "italic" }}>Geen vragen in deze sectie.</div>
+              <div style={{ fontSize: 12, color: "#aaa", fontStyle: "italic" }}>No questions in this section.</div>
             ) : section.items.filter((i) => i.answer_type !== "signature").map((item, idx) => {
               const flagged = isActionItem(item, optionsBySet, responseByItem);
               const color = answerColor(item, optionsBySet, responseByItem);
@@ -165,7 +165,7 @@ export default function AuditReport({ auditId, onBack }) {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                           <thead>
                             <tr>
-                              {[item.stock_col1_label || "Kol1", item.stock_col2_label || "Kol2", item.stock_col3_label || "Kol3"].map((h) => (
+                              {[item.stock_col1_label || "Col1", item.stock_col2_label || "Col2", item.stock_col3_label || "Col3"].map((h) => (
                                 <th key={h} style={{ textAlign: "left", color: "#aaa", fontWeight: 500, padding: "3px 6px", borderBottom: "0.5px solid #ddd" }}>{h}</th>
                               ))}
                             </tr>

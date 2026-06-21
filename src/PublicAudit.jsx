@@ -75,7 +75,7 @@ function AnswerInput({ item, options, value, onChange }) {
     return (
       <div style={{ marginTop: 7, display: "flex", alignItems: "center", gap: 8 }}>
         <input type="checkbox" checked={value === "true"} onChange={(e) => onChange(String(e.target.checked))} style={{ width: 16, height: 16, accentColor: "#1D9E75" }} />
-        <span style={{ fontSize: 13, color: "#555" }}>Ja</span>
+        <span style={{ fontSize: 13, color: "#555" }}>Yes</span>
       </div>
     );
   }
@@ -134,11 +134,11 @@ function PublicStockTake({ item, auditId }) {
     }, 600);
   }
 
-  if (loading) return <div style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>Laden...</div>;
+  if (loading) return <div style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>Loading...</div>;
 
-  const col1 = item.stock_col1_label || "Kolom 1";
-  const col2 = item.stock_col2_label || "Kolom 2";
-  const col3 = item.stock_col3_label || "Aantal";
+  const col1 = item.stock_col1_label || "Column 1";
+  const col2 = item.stock_col2_label || "Column 2";
+  const col3 = item.stock_col3_label || "Quantity";
 
   return (
     <div style={{ marginTop: 8, overflowX: "auto" }}>
@@ -219,9 +219,9 @@ export default function PublicAudit({ token }) {
   }, [token]);
 
   function verifyEmail() {
-    if (!email.trim()) { setEmailError("Vul je e-mailadres in."); return; }
+    if (!email.trim()) { setEmailError("Please enter your email address."); return; }
     if (email.trim().toLowerCase() !== link.allowed_email.toLowerCase()) {
-      setEmailError("Dit e-mailadres komt niet overeen met de uitnodiging.");
+      setEmailError("This email address does not match the invitation.");
       return;
     }
     setEmailError(null);
@@ -241,7 +241,7 @@ export default function PublicAudit({ token }) {
 
   async function handleSubmit() {
     if (submitting) return;
-    if (!confirm("Audit indienen? Dit kan niet ongedaan worden gemaakt.")) return;
+    if (!confirm("Submit audit? This cannot be undone.")) return;
     setSubmitting(true);
     await supabase.from("audits").update({ status: "submitted", submitted_at: new Date().toISOString() }).eq("id", link.audit_id);
     await supabase.from("audit_links").update({ status: "closed" }).eq("id", link.id);
@@ -306,31 +306,31 @@ export default function PublicAudit({ token }) {
   // ── Render phases ──
   if (phase === "loading") return (
     <div style={{ textAlign: "center", padding: "4rem", color: "#aaa", fontFamily: "system-ui,sans-serif" }}>
-      <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Audit laden...
+      <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Loading audit...
     </div>
   );
 
   if (phase === "error") return (
     <div style={{ textAlign: "center", padding: "4rem", fontFamily: "system-ui,sans-serif" }}>
       <i className="ti ti-alert-circle" style={{ fontSize: 40, color: "#E24B4A", display: "block", marginBottom: 12 }} />
-      <div style={{ fontSize: 16, fontWeight: 600 }}>Link niet gevonden</div>
-      <div style={{ fontSize: 13, color: "#888", marginTop: 8 }}>Deze auditlink bestaat niet of is verlopen.</div>
+      <div style={{ fontSize: 16, fontWeight: 600 }}>Link not found</div>
+      <div style={{ fontSize: 13, color: "#888", marginTop: 8 }}>This audit link does not exist or has expired.</div>
     </div>
   );
 
   if (phase === "closed") return (
     <div style={{ textAlign: "center", padding: "4rem", fontFamily: "system-ui,sans-serif" }}>
       <i className="ti ti-lock" style={{ fontSize: 40, color: "#EF9F27", display: "block", marginBottom: 12 }} />
-      <div style={{ fontSize: 16, fontWeight: 600 }}>Audit gesloten</div>
-      <div style={{ fontSize: 13, color: "#888", marginTop: 8 }}>Deze audit is al ingediend en kan niet meer worden geopend.</div>
+      <div style={{ fontSize: 16, fontWeight: 600 }}>Audit closed</div>
+      <div style={{ fontSize: 13, color: "#888", marginTop: 8 }}>This audit has already been submitted and can no longer be opened.</div>
     </div>
   );
 
   if (phase === "submitted") return (
     <div style={{ textAlign: "center", padding: "4rem", fontFamily: "system-ui,sans-serif" }}>
       <i className="ti ti-circle-check" style={{ fontSize: 48, color: "#1D9E75", display: "block", marginBottom: 12 }} />
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#09325A" }}>Audit ingediend!</div>
-      <div style={{ fontSize: 13, color: "#888", marginTop: 8 }}>Bedankt voor het invullen. Je kunt dit venster sluiten.</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#09325A" }}>Audit submitted!</div>
+      <div style={{ fontSize: 13, color: "#888", marginTop: 8 }}>Thank you for completing it. You can close this window.</div>
     </div>
   );
 
@@ -342,15 +342,15 @@ export default function PublicAudit({ token }) {
       <div style={s.card}>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>{audit?.locations?.name || "Audit"}</div>
         <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>{audit?.audit_templates?.name}</div>
-        <div style={s.label}>Bevestig je e-mailadres om te beginnen</div>
+        <div style={s.label}>Confirm your email address to begin</div>
         <input
           type="email" value={email} onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && verifyEmail()}
-          style={s.input} placeholder="jouw@emailadres.nl" autoFocus
+          style={s.input} placeholder="your@email.com" autoFocus
         />
         {emailError && <div style={{ fontSize: 12, color: "#E24B4A", marginTop: 6 }}>{emailError}</div>}
         <button style={{ ...s.btn(true), marginTop: 14, width: "100%", justifyContent: "center" }} onClick={verifyEmail}>
-          <i className="ti ti-arrow-right" /> Doorgaan
+          <i className="ti ti-arrow-right" /> Continue
         </button>
       </div>
     </div>
@@ -446,10 +446,10 @@ export default function PublicAudit({ token }) {
       {/* Submit */}
       <div style={{ padding: "16px 16px 0" }}>
         <button disabled={submitting} onClick={handleSubmit} style={{ ...s.btn(true), width: "100%", justifyContent: "center", padding: 12, fontSize: 14 }}>
-          <i className="ti ti-send" /> {submitting ? "Indienen..." : "Audit indienen"}
+          <i className="ti ti-send" /> {submitting ? "Submitting..." : "Submit audit"}
         </button>
         <div style={{ fontSize: 11, color: "#aaa", textAlign: "center", marginTop: 8 }}>
-          Na indiening kan de audit niet meer worden gewijzigd.
+          Once submitted, the audit can no longer be changed.
         </div>
       </div>
     </div>

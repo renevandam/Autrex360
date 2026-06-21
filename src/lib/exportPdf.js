@@ -76,7 +76,7 @@ export async function exportAuditToPdf(auditId) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text(organization?.name || "Audit rapport", margin, 42);
+  doc.text(organization?.name || "Audit report", margin, 42);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   if (organization?.address) {
@@ -99,10 +99,10 @@ export async function exportAuditToPdf(auditId) {
   // ── Summary ──
   heading(audit.locations?.name || audit.audit_templates?.name || "Audit", 16);
   bodyLine("Template", audit.audit_templates?.name);
-  bodyLine("Datum", new Date(audit.audit_date).toLocaleDateString("nl-NL"));
+  bodyLine("Date", new Date(audit.audit_date).toLocaleDateString("en-US"));
   bodyLine("Auditor", audit.auditor_name);
   bodyLine("Status", STATUS_LABEL[audit.status] || audit.status);
-  if (audit.location_id) bodyLine("Adres geverifieerd", audit.address_verified ? "Ja" : "Nee");
+  if (audit.location_id) bodyLine("Address verified", audit.address_verified ? "Yes" : "No");
 
   if (audit.score_pct !== null && audit.score_pct !== undefined) {
     y += 6;
@@ -115,7 +115,7 @@ export async function exportAuditToPdf(auditId) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...GREY);
-    doc.text(`${audit.score_achieved ?? "?"} / ${audit.score_max ?? "?"} punten`, margin + 80, y + 24);
+    doc.text(`${audit.score_achieved ?? "?"} / ${audit.score_max ?? "?"} points`, margin + 80, y + 24);
     y += 40;
   } else {
     y += 6;
@@ -123,7 +123,7 @@ export async function exportAuditToPdf(auditId) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(10);
     doc.setTextColor(...GREY);
-    doc.text("Score nog niet beschikbaar (audit is nog niet ingediend)", margin, y + 4);
+    doc.text("Score not yet available (audit has not been submitted yet)", margin, y + 4);
     y += 20;
   }
 
@@ -135,7 +135,7 @@ export async function exportAuditToPdf(auditId) {
 
   if (actionItems.length > 0) {
     y += 6;
-    heading(`Actiepunten (${actionItems.length})`, 13, RED);
+    heading(`Action items (${actionItems.length})`, 13, RED);
     actionItems.forEach(({ section, item }) => {
       ensureSpace(16);
       doc.setFont("helvetica", "normal");
@@ -152,7 +152,7 @@ export async function exportAuditToPdf(auditId) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(10);
     doc.setTextColor(...GREEN);
-    doc.text("Geen actiepunten gesignaleerd.", margin, y + 4);
+    doc.text("No action items flagged.", margin, y + 4);
     y += 20;
   }
 
@@ -160,7 +160,7 @@ export async function exportAuditToPdf(auditId) {
     y += 6;
     ensureSpace(24);
     const qaColor = audit.qa_status === "approved" ? GREEN : audit.qa_status === "rejected" ? RED : ORANGE;
-    const qaLabel = audit.qa_status === "approved" ? "QA: Goedgekeurd" : audit.qa_status === "rejected" ? "QA: Afgekeurd" : "QA: In afwachting van beoordeling";
+    const qaLabel = audit.qa_status === "approved" ? "QA: Approved" : audit.qa_status === "rejected" ? "QA: Rejected" : "QA: Pending review";
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(...qaColor);
@@ -170,7 +170,7 @@ export async function exportAuditToPdf(auditId) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(60, 60, 60);
-      const wrappedNote = doc.splitTextToSize(`Notitie: ${audit.qa_note}`, pageWidth - margin * 2);
+      const wrappedNote = doc.splitTextToSize(`Note: ${audit.qa_note}`, pageWidth - margin * 2);
       ensureSpace(wrappedNote.length * 13);
       doc.text(wrappedNote, margin, y);
       y += wrappedNote.length * 13 + 4;
@@ -191,7 +191,7 @@ export async function exportAuditToPdf(auditId) {
       doc.setFontSize(10);
       doc.setTextColor(...GREY);
       ensureSpace(16);
-      doc.text("Geen vragen in deze sectie.", margin, y);
+      doc.text("No questions in this section.", margin, y);
       y += 16;
     }
     for (const item of section.items) {
@@ -208,14 +208,14 @@ export async function exportAuditToPdf(auditId) {
         const rows = stockByItem[item.id] || [];
         doc.setFont("helvetica", "italic");
         doc.setTextColor(...GREY);
-        doc.text(`${rows.length} rij(en)`, pageWidth - margin - 140, y);
+        doc.text(`${rows.length} row(s)`, pageWidth - margin - 140, y);
         y += wrappedLabel.length * 13 + 4;
         rows.forEach((r) => {
           ensureSpace(14);
           doc.setFont("helvetica", "normal");
           doc.setFontSize(9);
           doc.setTextColor(60, 60, 60);
-          doc.text(`   ${item.stock_col1_label || "Kol1"}: ${r.col1_value || "—"}  ·  ${item.stock_col2_label || "Kol2"}: ${r.col2_value || "—"}  ·  ${item.stock_col3_label || "Kol3"}: ${r.col3_value || "—"}`, margin, y);
+          doc.text(`   ${item.stock_col1_label || "Col1"}: ${r.col1_value || "—"}  ·  ${item.stock_col2_label || "Col2"}: ${r.col2_value || "—"}  ·  ${item.stock_col3_label || "Col3"}: ${r.col3_value || "—"}`, margin, y);
           y += 13;
         });
       } else {
@@ -264,11 +264,11 @@ export async function exportAuditToPdf(auditId) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...GREY);
-    doc.text(`Pagina ${i} van ${pageCount}`, pageWidth - margin - 60, pageHeight - 24);
-    doc.text(`Gegenereerd op ${new Date().toLocaleDateString("nl-NL")}`, margin, pageHeight - 24);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 60, pageHeight - 24);
+    doc.text(`Generated on ${new Date().toLocaleDateString("en-US")}`, margin, pageHeight - 24);
     doc.text("Powered by Autrex360", pageWidth / 2 - 38, pageHeight - 24);
   }
 
-  const fileName = `audit-${(audit.locations?.name || audit.audit_templates?.name || "rapport").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${audit.audit_date}.pdf`;
+  const fileName = `audit-${(audit.locations?.name || audit.audit_templates?.name || "report").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${audit.audit_date}.pdf`;
   doc.save(fileName);
 }
