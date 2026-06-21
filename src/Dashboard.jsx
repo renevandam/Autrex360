@@ -180,6 +180,9 @@ function AnswerSetDetail({ set, canManage, onBack }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [setName, setSetName] = useState(set.name);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(set.name);
 
   async function load() {
     setLoading(true);
@@ -188,6 +191,13 @@ function AnswerSetDetail({ set, canManage, onBack }) {
     setLoading(false);
   }
   useEffect(() => { load(); }, [set.id]);
+
+  async function saveSetName() {
+    if (!nameDraft.trim()) return;
+    await supabase.from("answer_sets").update({ name: nameDraft.trim() }).eq("id", set.id);
+    setSetName(nameDraft.trim());
+    setEditingName(false);
+  }
 
   async function addOption() {
     if (!form.label.trim()) return;
@@ -245,7 +255,26 @@ function AnswerSetDetail({ set, canManage, onBack }) {
     <div style={s.page}>
       <button style={s.backBtn} onClick={onBack}><i className="ti ti-arrow-left" /> All answer sets</button>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>{set.name}</div>
+        {editingName ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveSetName()}
+              style={{ ...s.input, marginTop: 0, fontSize: 16, fontWeight: 600, maxWidth: 280 }}
+              autoFocus
+            />
+            <button onClick={saveSetName} style={{ fontSize: 12, color: "#1D9E75", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-check" /></button>
+            <button onClick={() => { setNameDraft(setName); setEditingName(false); }} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>{setName}</div>
+            {canManage && (
+              <button onClick={() => { setNameDraft(setName); setEditingName(true); }} style={{ fontSize: 12, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
+            )}
+          </div>
+        )}
         <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Manage the options in this answer set</div>
       </div>
 
