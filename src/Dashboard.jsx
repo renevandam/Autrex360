@@ -478,6 +478,20 @@ function TemplateDetail({ template, canManage, onBack }) {
     await supabase.from("template_sections").delete().eq("id", id); await load();
   }
 
+  async function moveSection(sectionId, direction) {
+    const idx = sections.findIndex((s) => s.id === sectionId);
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= sections.length) return;
+    const current = sections[idx];
+    const target = sections[targetIdx];
+    // Swap sort_order values between the two sections
+    await Promise.all([
+      supabase.from("template_sections").update({ sort_order: target.sort_order }).eq("id", current.id),
+      supabase.from("template_sections").update({ sort_order: current.sort_order }).eq("id", target.id),
+    ]);
+    await load();
+  }
+
   const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5" };
 
   function toggleItemForm(sectionId) {
@@ -517,6 +531,20 @@ function TemplateDetail({ template, canManage, onBack }) {
   async function removeItem(id) {
     if (!confirm("Vraag verwijderen?")) return;
     await supabase.from("template_items").delete().eq("id", id); await load();
+  }
+
+  async function moveItem(sectionId, itemId, direction) {
+    const sectionItems = items[sectionId] || [];
+    const idx = sectionItems.findIndex((i) => i.id === itemId);
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= sectionItems.length) return;
+    const current = sectionItems[idx];
+    const target = sectionItems[targetIdx];
+    await Promise.all([
+      supabase.from("template_items").update({ sort_order: target.sort_order }).eq("id", current.id),
+      supabase.from("template_items").update({ sort_order: current.sort_order }).eq("id", target.id),
+    ]);
+    await load();
   }
 
   function startEdit(item) {
@@ -575,11 +603,17 @@ function TemplateDetail({ template, canManage, onBack }) {
 
       {loading ? <div style={s.empty}>Laden...</div> : (
         <>
-          {sections.map((section) => (
+          {sections.map((section, secIdx) => (
             <div key={section.id} style={{ ...s.card, marginBottom: 14 }}>
               <div style={s.row}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{section.name}</div>
-                {canManage && <button onClick={() => removeSection(section.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
+                {canManage && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <button onClick={() => moveSection(section.id, -1)} disabled={secIdx === 0} style={{ fontSize: 13, color: secIdx === 0 ? "#ddd" : "#888", border: "none", background: "none", cursor: secIdx === 0 ? "default" : "pointer" }}><i className="ti ti-chevron-up" /></button>
+                    <button onClick={() => moveSection(section.id, 1)} disabled={secIdx === sections.length - 1} style={{ fontSize: 13, color: secIdx === sections.length - 1 ? "#ddd" : "#888", border: "none", background: "none", cursor: secIdx === sections.length - 1 ? "default" : "pointer" }}><i className="ti ti-chevron-down" /></button>
+                    <button onClick={() => removeSection(section.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer", marginLeft: 4 }}><i className="ti ti-trash" /></button>
+                  </div>
+                )}
               </div>
               <div style={{ marginTop: 10 }}>
                 {(items[section.id] || []).map((item, idx) => (
@@ -660,8 +694,10 @@ function TemplateDetail({ template, canManage, onBack }) {
                         </div>
                       </div>
                       {canManage && (
-                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                          <button onClick={() => startEdit(item)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-pencil" /></button>
+                        <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
+                          <button onClick={() => moveItem(section.id, item.id, -1)} disabled={idx === 0} style={{ fontSize: 12, color: idx === 0 ? "#ddd" : "#888", border: "none", background: "none", cursor: idx === 0 ? "default" : "pointer" }}><i className="ti ti-chevron-up" /></button>
+                          <button onClick={() => moveItem(section.id, item.id, 1)} disabled={idx === (items[section.id] || []).length - 1} style={{ fontSize: 12, color: idx === (items[section.id] || []).length - 1 ? "#ddd" : "#888", border: "none", background: "none", cursor: idx === (items[section.id] || []).length - 1 ? "default" : "pointer" }}><i className="ti ti-chevron-down" /></button>
+                          <button onClick={() => startEdit(item)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer", marginLeft: 2 }}><i className="ti ti-pencil" /></button>
                           <button onClick={() => removeItem(item.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>
                         </div>
                       )}
