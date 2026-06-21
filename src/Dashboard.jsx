@@ -977,6 +977,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all"); // all | draft | submitted | pending | approved | rejected
   const [exportingId, setExportingId] = useState(null);
   const [linkModal, setLinkModal] = useState(null); // { auditId } | null
   const [linkEmail, setLinkEmail] = useState("");
@@ -1054,9 +1055,28 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
   const statusLabel = { draft: "Concept", submitted: "Ingediend" };
   const qaStatusColor = { pending: "#EF9F27", approved: "#1D9E75", rejected: "#E24B4A" };
   const qaStatusLabel = { pending: "QA: in afwachting", approved: "QA: goedgekeurd", rejected: "QA: afgekeurd" };
+
+  const STATUS_FILTERS = [
+    { value: "all", label: "Alle" },
+    { value: "draft", label: "Concept" },
+    { value: "submitted", label: "Ingediend" },
+    { value: "pending", label: "QA: in afwachting" },
+    { value: "approved", label: "QA: goedgekeurd" },
+    { value: "rejected", label: "QA: afgekeurd" },
+  ];
+
+  function matchesStatusFilter(audit) {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "draft") return audit.status === "draft";
+    // "submitted" means submitted AND no QA process applies, to avoid overlapping with the QA filters
+    if (statusFilter === "submitted") return audit.status === "submitted" && (!audit.qa_status || audit.qa_status === "not_required");
+    return audit.qa_status === statusFilter;
+  }
+
   const visibleAudits = audits
     .filter((a) => !!a.archived === showArchived)
-    .filter((a) => !search.trim() || (a.audit_templates?.name || "").toLowerCase().includes(search.trim().toLowerCase()));
+    .filter((a) => !search.trim() || (a.audit_templates?.name || "").toLowerCase().includes(search.trim().toLowerCase()))
+    .filter(matchesStatusFilter);
 
   return (
     <div style={s.page}>
@@ -1069,6 +1089,24 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
           <button style={s.btn(true)} onClick={onNewAudit}><i className="ti ti-plus" /> Nieuwe audit</button>
         </div>
       </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, overflowX: "auto", paddingBottom: 2 }}>
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setStatusFilter(f.value)}
+            style={{
+              flexShrink: 0, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
+              padding: "6px 12px", borderRadius: 20,
+              border: statusFilter === f.value ? "1.5px solid #1D9E75" : "1px solid #ddd",
+              background: statusFilter === f.value ? "#E1F5EE" : "white",
+              color: statusFilter === f.value ? "#085041" : "#555",
+              cursor: "pointer",
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
       <div style={{ marginBottom: 14, position: "relative" }}>
         <i className="ti ti-search" style={{ position: "absolute", left: 11, top: 10, fontSize: 14, color: "#aaa" }} />
         <input
@@ -1079,7 +1117,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
         />
       </div>
       {loading ? <div style={s.empty}>Laden...</div>
-        : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "Geen gearchiveerde audits." : search.trim() ? "Geen audits gevonden voor deze zoekterm." : "Nog geen audits."}</div>
+        : visibleAudits.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-clipboard-list"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "Geen gearchiveerde audits." : search.trim() || statusFilter !== "all" ? "Geen audits gevonden voor deze filter(s)." : "Nog geen audits."}</div>
         : visibleAudits.map((audit) => (
           <div
             key={audit.id}
