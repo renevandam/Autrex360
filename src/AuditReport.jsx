@@ -101,6 +101,23 @@ export default function AuditReport({ auditId, onBack }) {
           )}
         </div>
 
+        {/* QA status */}
+        {audit.qa_status && audit.qa_status !== "not_required" && (
+          <div style={{ marginTop: 18 }}>
+            {(() => {
+              const qaColor = audit.qa_status === "approved" ? "#1D9E75" : audit.qa_status === "rejected" ? "#E24B4A" : "#EF9F27";
+              const qaLabel = audit.qa_status === "approved" ? "QA: Goedgekeurd" : audit.qa_status === "rejected" ? "QA: Afgekeurd" : "QA: In afwachting van beoordeling";
+              const qaBg = audit.qa_status === "approved" ? "#E1F5EE" : audit.qa_status === "rejected" ? "#FCEBEB" : "#FAEEDA";
+              return (
+                <div style={{ background: qaBg, border: `0.5px solid ${qaColor}`, borderRadius: 10, padding: "0.75rem 1rem" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: qaColor }}>{qaLabel}</div>
+                  {audit.qa_note && <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>{audit.qa_note}</div>}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* Action items */}
         <div style={{ marginTop: 18 }}>
           {actionItems.length > 0 ? (

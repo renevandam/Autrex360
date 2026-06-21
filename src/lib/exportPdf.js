@@ -9,7 +9,7 @@ const RED = [226, 75, 74];           // #E24B4A
 const GREY = [136, 136, 136];
 
 export async function exportAuditToPdf(auditId) {
-  const { audit, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = await loadAuditReportData(auditId);
+  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = await loadAuditReportData(auditId);
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -71,10 +71,23 @@ export async function exportAuditToPdf(auditId) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text("Audit · Simplified", margin, 58);
+
+  if (organization?.logo_url) {
+    const logoDataUrl = await loadImageAsDataUrl(organization.logo_url);
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, "PNG", pageWidth - margin - 50, 12, 50, 46);
+      } catch {
+        // skip if jsPDF can't decode this image format
+      }
+    }
+  }
+
   y = 100;
 
   // ── Summary ──
   heading(audit.locations?.name || audit.audit_templates?.name || "Audit", 16);
+  if (organization?.name) bodyLine("Organisatie", organization.name);
   bodyLine("Template", audit.audit_templates?.name);
   bodyLine("Datum", new Date(audit.audit_date).toLocaleDateString("nl-NL"));
   bodyLine("Auditor", audit.auditor_name);
@@ -131,6 +144,27 @@ export async function exportAuditToPdf(auditId) {
     doc.setTextColor(...GREEN);
     doc.text("Geen actiepunten gesignaleerd.", margin, y + 4);
     y += 20;
+  }
+
+  if (audit.qa_status && audit.qa_status !== "not_required") {
+    y += 6;
+    ensureSpace(24);
+    const qaColor = audit.qa_status === "approved" ? GREEN : audit.qa_status === "rejected" ? RED : ORANGE;
+    const qaLabel = audit.qa_status === "approved" ? "QA: Goedgekeurd" : audit.qa_status === "rejected" ? "QA: Afgekeurd" : "QA: In afwachting van beoordeling";
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...qaColor);
+    doc.text(qaLabel, margin, y);
+    y += 16;
+    if (audit.qa_note) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+      const wrappedNote = doc.splitTextToSize(`Notitie: ${audit.qa_note}`, pageWidth - margin * 2);
+      ensureSpace(wrappedNote.length * 13);
+      doc.text(wrappedNote, margin, y);
+      y += wrappedNote.length * 13 + 4;
+    }
   }
 
   // ── Detailed sections ──

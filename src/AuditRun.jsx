@@ -379,7 +379,7 @@ function AnswerInput({ item, options, value, onChange }) {
 }
 
 // ── Main AuditRun ─────────────────────────────────────────
-export default function AuditRun({ session, auditId, locationId, templateId, location, template, onBack }) {
+export default function AuditRun({ session, profile, auditId, locationId, templateId, location, template, onBack }) {
   const [sections, setSections] = useState([]);
   const [itemOptions, setItemOptions] = useState({});
   const [responses, setResponses] = useState({});
@@ -680,8 +680,15 @@ export default function AuditRun({ session, auditId, locationId, templateId, loc
     if (submitting) return;
     setSubmitting(true);
     if (auditId) {
+      // Check whether this organization requires QA approval before an audit counts as fully done
+      let qaEnabled = false;
+      if (profile?.organization_id) {
+        const { data: org } = await supabase.from("organizations").select("qa_approval_enabled").eq("id", profile.organization_id).single();
+        qaEnabled = !!org?.qa_approval_enabled;
+      }
       await supabase.from("audits").update({
         status: "submitted",
+        qa_status: qaEnabled ? "pending" : "not_required",
         score_achieved: relevantMax > 0 ? Math.round(achieved) : null,
         score_max: relevantMax > 0 ? Math.round(relevantMax) : null,
         score_pct: relevantMax > 0 ? pct : null,

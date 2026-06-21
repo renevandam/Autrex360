@@ -9,6 +9,7 @@ const NAV = [
   { id: "templates",  label: "Templates",   icon: "ti-file-description" },
   { id: "audits",     label: "Audits",      icon: "ti-clipboard-check" },
   { id: "users",      label: "Gebruikers",  icon: "ti-users" },
+  { id: "org",        label: "Organisatie", icon: "ti-building" },
 ];
 
 const ANSWER_TYPES = [
@@ -972,7 +973,7 @@ function Templates({ profile, canManage }) {
 }
 
 // ── Audits ───────────────────────────────────────────────
-function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport }) {
+function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport, canApproveQA }) {
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -982,6 +983,9 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport
   const [generatedLink, setGeneratedLink] = useState(null);
   const [linkSaving, setLinkSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [qaModal, setQaModal] = useState(null); // { auditId } | null
+  const [qaNote, setQaNote] = useState("");
+  const [qaSaving, setQaSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -1031,8 +1035,25 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport
     await load();
   }
 
+  async function handleQaDecision(decision) {
+    if (!qaModal || qaSaving) return;
+    setQaSaving(true);
+    await supabase.from("audits").update({
+      qa_status: decision,
+      qa_note: qaNote || null,
+      qa_reviewed_by: session.user.id,
+      qa_reviewed_at: new Date().toISOString(),
+    }).eq("id", qaModal.auditId);
+    setQaSaving(false);
+    setQaModal(null);
+    setQaNote("");
+    await load();
+  }
+
   const statusColor = { draft: "#EF9F27", submitted: "#1D9E75" };
   const statusLabel = { draft: "Concept", submitted: "Ingediend" };
+  const qaStatusColor = { pending: "#EF9F27", approved: "#1D9E75", rejected: "#E24B4A" };
+  const qaStatusLabel = { pending: "QA: in afwachting", approved: "QA: goedgekeurd", rejected: "QA: afgekeurd" };
   const visibleAudits = audits
     .filter((a) => !!a.archived === showArchived)
     .filter((a) => !search.trim() || (a.audit_templates?.name || "").toLowerCase().includes(search.trim().toLowerCase()));
@@ -1081,12 +1102,20 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport
                   {audit.created_at && <> · <i className="ti ti-clock" style={{ fontSize: 12 }} /> {new Date(audit.created_at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</>}
                   {audit.auditor_name && <> · {audit.auditor_name}</>}
                 </div>
-                <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
+                <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <span style={s.badge(statusColor[audit.status] || "#aaa")}>{statusLabel[audit.status] || audit.status}</span>
                   {audit.score_pct !== null && <span style={s.badge("#378ADD")}>{audit.score_pct}%</span>}
+                  {audit.qa_status && audit.qa_status !== "not_required" && (
+                    <span style={s.badge(qaStatusColor[audit.qa_status] || "#aaa")}>{qaStatusLabel[audit.qa_status] || audit.qa_status}</span>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(e) => e.stopPropagation()}>
+                {canApproveQA && audit.qa_status === "pending" && (
+                  <button onClick={() => { setQaModal({ auditId: audit.id }); setQaNote(""); }} style={{ fontSize: 12, color: "#EF9F27", border: "none", background: "none", cursor: "pointer" }} title="QA beoordelen">
+                    <i className="ti ti-clipboard-check" />
+                  </button>
+                )}
                 <button onClick={() => onViewReport && onViewReport(audit.id)} style={{ fontSize: 12, color: "#1D9E75", border: "none", background: "none", cursor: "pointer" }} title="Bekijk rapport">
                   <i className="ti ti-eye" />
                 </button>
@@ -1137,6 +1166,27 @@ function Audits({ onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* QA approval modal */}
+      {qaModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 400 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Audit beoordelen</div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Keur deze audit goed of af, met een optionele notitie.</div>
+            <div style={s.label}>Notitie (optioneel)</div>
+            <textarea value={qaNote} onChange={(e) => setQaNote(e.target.value)} rows={3} style={{ ...s.input, resize: "vertical" }} placeholder="Toelichting bij je beslissing" />
+            <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+              <button style={{ ...s.btn(true), background: "#1D9E75" }} onClick={() => handleQaDecision("approved")} disabled={qaSaving}>
+                <i className="ti ti-check" /> Goedkeuren
+              </button>
+              <button style={{ ...s.btn(true), background: "#E24B4A" }} onClick={() => handleQaDecision("rejected")} disabled={qaSaving}>
+                <i className="ti ti-x" /> Afkeuren
+              </button>
+              <button style={s.btn(false)} onClick={() => setQaModal(null)}>Annuleren</button>
+            </div>
           </div>
         </div>
       )}
@@ -1205,6 +1255,121 @@ function ChangePasswordModal({ email, onClose }) {
   );
 }
 
+// ── Organization settings ───────────────────────────────────
+function OrganizationSettings({ profile }) {
+  const [org, setOrg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [form, setForm] = useState({ name: "", address: "", qa_approval_enabled: false });
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const logoInputRef = useRef(null);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase.from("organizations").select("*").eq("id", profile.organization_id).single();
+    if (data) {
+      setOrg(data);
+      setForm({ name: data.name || "", address: data.address || "", qa_approval_enabled: !!data.qa_approval_enabled });
+    }
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+    const { error: updateError } = await supabase.from("organizations").update({
+      name: form.name,
+      address: form.address,
+      qa_approval_enabled: form.qa_approval_enabled,
+    }).eq("id", profile.organization_id);
+    setSaving(false);
+    if (updateError) { setError(updateError.message); return; }
+    setSuccess(true);
+    await load();
+  }
+
+  async function handleLogoUpload(file) {
+    if (!file) return;
+    setUploadingLogo(true);
+    setError(null);
+    try {
+      const ext = file.name?.split(".").pop() || "png";
+      const path = `${profile.organization_id}/logo-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("organization-logos").upload(path, file, {
+        contentType: file.type || "image/png",
+        cacheControl: "3600",
+        upsert: true,
+      });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("organization-logos").getPublicUrl(path);
+      await supabase.from("organizations").update({ logo_url: urlData.publicUrl }).eq("id", profile.organization_id);
+      await load();
+    } catch (e) {
+      setError("Logo uploaden mislukt: " + e.message);
+    }
+    setUploadingLogo(false);
+  }
+
+  if (loading) return <div style={s.empty}>Laden...</div>;
+
+  return (
+    <div style={s.page}>
+      <div style={s.sTitle}><span>Organisatie</span></div>
+
+      {error && (
+        <div style={{ fontSize: 12, color: "#A32D2D", background: "#FCEBEB", border: "1px solid #E24B4A", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>{error}</div>
+      )}
+      {success && (
+        <div style={{ fontSize: 12, color: "#0F6E56", background: "#E1F5EE", border: "1px solid #1D9E75", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>Opgeslagen.</div>
+      )}
+
+      <div style={s.card}>
+        <div style={s.label}>Logo</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          {org?.logo_url ? (
+            <img src={org.logo_url} style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 8, border: "1px solid #eee", background: "#fafafa" }} />
+          ) : (
+            <div style={{ width: 64, height: 64, borderRadius: 8, border: "1px dashed #ddd", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc" }}>
+              <i className="ti ti-building" style={{ fontSize: 24 }} />
+            </div>
+          )}
+          <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} style={s.btn(false)}>
+            <i className="ti ti-upload" /> {uploadingLogo ? "Uploaden..." : "Logo uploaden"}
+          </button>
+          <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { handleLogoUpload(e.target.files[0]); e.target.value = ""; }} />
+        </div>
+
+        <div style={s.label}>Bedrijfsnaam</div>
+        <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={s.input} placeholder="bijv. Outpath Solutions" />
+
+        <div style={{ ...s.label, marginTop: 10 }}>Adres</div>
+        <textarea value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} rows={2} style={{ ...s.input, resize: "vertical" }} placeholder="Straat, postcode, plaats" />
+
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "0.5px solid #eee" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Workflow</div>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={form.qa_approval_enabled} onChange={(e) => setForm((f) => ({ ...f, qa_approval_enabled: e.target.checked }))} style={{ width: 15, height: 15, accentColor: "#1D9E75", marginTop: 2 }} />
+            <span style={{ fontSize: 12, color: "#555" }}>
+              QA-goedkeuring vereist<br />
+              <span style={{ fontSize: 11, color: "#aaa" }}>Ingediende audits moeten eerst door een admin/manager worden goedgekeurd voordat ze definitief zijn.</span>
+            </span>
+          </label>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <button style={s.btn(true)} onClick={save} disabled={saving}>
+            <i className="ti ti-check" /> {saving ? "Opslaan..." : "Opslaan"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ROLE_LABEL = { admin: "Admin", manager: "Manager", auditor: "Auditor", viewer: "Viewer" };
 const CAN_MANAGE = ["admin", "manager"]; // who can create/edit/delete locations, templates, answer sets
 const CAN_DELETE_AUDIT = ["admin"];
@@ -1213,7 +1378,7 @@ const CAN_ARCHIVE_AUDIT = ["admin", "manager"];
 function navForRole(role) {
   let nav = NAV;
   if (role === "viewer" || role === "auditor") nav = nav.filter((n) => n.id !== "answersets"); // only admin/manager manage answer sets
-  if (role !== "admin") nav = nav.filter((n) => n.id !== "users"); // only admins manage users
+  if (role !== "admin") nav = nav.filter((n) => n.id !== "users" && n.id !== "org"); // only admins manage users and org settings
   return nav;
 }
 
@@ -1422,8 +1587,9 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
       {page === "locations"  && <Locations profile={profile} canManage={canManage} />}
       {page === "answersets" && <AnswerSets profile={profile} canManage={canManage} />}
       {page === "templates"  && <Templates profile={profile} canManage={canManage} />}
-      {page === "audits"     && <Audits onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} canArchive={canArchiveAudit} onViewReport={onViewReport} />}
+      {page === "audits"     && <Audits session={session} onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} canArchive={canArchiveAudit} onViewReport={onViewReport} canApproveQA={canArchiveAudit} />}
       {page === "users"      && <Users profile={profile} session={session} />}
+      {page === "org"        && <OrganizationSettings profile={profile} />}
     </div>
   );
 }
