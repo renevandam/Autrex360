@@ -567,7 +567,15 @@ function AnswerSets({ profile, canManage }) {
 
   async function remove(id) {
     if (!confirm("Delete this answer set?")) return;
-    await supabase.from("answer_sets").delete().eq("id", id);
+    const { error } = await supabase.from("answer_sets").delete().eq("id", id);
+    if (error) {
+      if (error.code === "23503") {
+        alert("This answer set is still being used by one or more questions in a template. Remove it from those questions first, then try again.");
+      } else {
+        alert("Could not delete this answer set: " + error.message);
+      }
+      return;
+    }
     await load();
   }
 
