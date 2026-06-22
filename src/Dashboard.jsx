@@ -363,25 +363,32 @@ function AnswerSetDetail({ set, canManage, onBack }) {
           {options.map((opt, idx) => (
             editingId === opt.id ? (
               <div key={opt.id} style={{ marginTop: idx === 0 ? 0 : 8, marginBottom: 8, background: "white", border: "1px solid #1D9E75", borderRadius: 8, padding: 10 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <div style={{ gridColumn: "1 / -1" }}>
+                {setType === "slider" ? (
+                  <>
                     <div style={s.label}>Label *</div>
                     <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
-                  </div>
-                  <div>
-                    <div style={s.label}>Score {editForm.is_na && "(disabled - N/A)"}</div>
-                    <input type="number" disabled={editForm.is_na} value={editForm.score} onChange={(e) => setEditForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: editForm.is_na ? 0.5 : 1 }} placeholder="e.g. 3" />
-                  </div>
-                  <div>
-                    <div style={s.label}>Color</div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                      {OPTION_COLORS.map((c) => (
-                        <div key={c} onClick={() => setEditForm((f) => ({ ...f, color: c }))} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: editForm.color === c ? "2.5px solid #333" : "2px solid transparent" }} />
-                      ))}
+                  </>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={s.label}>Label *</div>
+                      <input value={editForm.label} onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))} style={s.input} autoFocus />
                     </div>
+                    <div>
+                      <div style={s.label}>Score {editForm.is_na && "(disabled - N/A)"}</div>
+                      <input type="number" disabled={editForm.is_na} value={editForm.score} onChange={(e) => setEditForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: editForm.is_na ? 0.5 : 1 }} placeholder="e.g. 3" />
+                    </div>
+                    <div>
+                      <div style={s.label}>Color</div>
+                      <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                        {OPTION_COLORS.map((c) => (
+                          <div key={c} onClick={() => setEditForm((f) => ({ ...f, color: c }))} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: editForm.color === c ? "2.5px solid #333" : "2px solid transparent" }} />
+                        ))}
+                      </div>
+                    </div>
+                    <FlagCheckboxes data={editForm} setData={setEditForm} />
                   </div>
-                  <FlagCheckboxes data={editForm} setData={setEditForm} />
-                </div>
+                )}
                 <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                   <button style={s.btn(true)} onClick={saveEdit}><i className="ti ti-check" /> Save</button>
                   <button style={s.btn(false)} onClick={cancelEdit}>Cancel</button>
@@ -404,32 +411,40 @@ function AnswerSetDetail({ set, canManage, onBack }) {
 
           {adding ? (
             <div style={{ marginTop: 12, background: "white", border: "0.5px solid #ddd", borderRadius: 8, padding: 10 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div style={{ gridColumn: "1 / -1" }}>
+              {setType === "slider" ? (
+                <>
                   <div style={s.label}>Label *</div>
-                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={s.input} placeholder="e.g. Satisfactory" autoFocus />
-                </div>
-                <div>
-                  <div style={s.label}>Score {form.is_na && "(disabled - N/A)"}</div>
-                  <input type="number" disabled={form.is_na} value={form.score} onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: form.is_na ? 0.5 : 1 }} placeholder="e.g. 3" />
-                </div>
-                <div>
-                  <div style={s.label}>Color</div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                    {OPTION_COLORS.map((c) => (
-                      <div key={c} onClick={() => setForm((f) => ({ ...f, color: c }))} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: form.color === c ? "2.5px solid #333" : "2px solid transparent" }} />
-                    ))}
+                  <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={s.input} placeholder="e.g. Not applicable" autoFocus />
+                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 6 }}>This will appear as a checkbox next to the slider. It's always treated as N/A and excluded from scoring.</div>
+                </>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={s.label}>Label *</div>
+                    <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={s.input} placeholder="e.g. Satisfactory" autoFocus />
                   </div>
+                  <div>
+                    <div style={s.label}>Score {form.is_na && "(disabled - N/A)"}</div>
+                    <input type="number" disabled={form.is_na} value={form.score} onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))} style={{ ...s.input, opacity: form.is_na ? 0.5 : 1 }} placeholder="e.g. 3" />
+                  </div>
+                  <div>
+                    <div style={s.label}>Color</div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                      {OPTION_COLORS.map((c) => (
+                        <div key={c} onClick={() => setForm((f) => ({ ...f, color: c }))} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: form.color === c ? "2.5px solid #333" : "2px solid transparent" }} />
+                      ))}
+                    </div>
+                  </div>
+                  <FlagCheckboxes data={form} setData={setForm} />
                 </div>
-                <FlagCheckboxes data={form} setData={setForm} />
-              </div>
+              )}
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <button style={s.btn(true)} onClick={addOption}><i className="ti ti-check" /> Add</button>
                 <button style={s.btn(false)} onClick={() => setAdding(false)}>Cancel</button>
               </div>
             </div>
           ) : (
-            canManage && <button style={{ ...s.btnSm, marginTop: options.length > 0 ? 10 : 0 }} onClick={() => setAdding(true)}><i className="ti ti-plus" /> Add option</button>
+            canManage && <button style={{ ...s.btnSm, marginTop: options.length > 0 ? 10 : 0 }} onClick={() => { setForm((f) => ({ ...f, is_na: setType === "slider" ? true : f.is_na })); setAdding(true); }}><i className="ti ti-plus" /> Add option</button>
           )}
         </div>
       )}
