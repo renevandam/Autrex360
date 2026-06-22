@@ -380,7 +380,7 @@ function AnswerInput({ item, options, value, onChange }) {
 }
 
 // ── Main AuditRun ─────────────────────────────────────────
-export default function AuditRun({ session, profile, auditId, locationId, templateId, location, template, onBack }) {
+export default function AuditRun({ session, profile, auditId, locationId, templateId, location, template, readOnly, onBack }) {
   const [sections, setSections] = useState([]);
   const [itemOptions, setItemOptions] = useState({});
   const [responses, setResponses] = useState({});
@@ -636,6 +636,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   }
 
   function setResponse(id, val) {
+    if (readOnly) return; // guard at the data layer - guest auditors can't edit a submitted audit
     setResponses((p) => ({ ...p, [id]: val }));
     if (!auditId) return;
     const responseText = typeof val === "boolean" ? String(val) : String(val ?? "");
@@ -806,6 +807,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       </div>
 
       {/* Offline status bar */}
+      {!readOnly && (
       <div style={{ padding:"8px 1.25rem",background:isOffline?"#FAEEDA":"#F0F7F4",borderBottom:"0.5px solid #eee",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8 }}>
         <div style={{ fontSize:12,color:isOffline?"#633806":"#0F6E56",display:"flex",alignItems:"center",gap:6 }}>
           <i className={`ti ${isOffline ? "ti-wifi-off" : "ti-wifi"}`} />
@@ -825,6 +827,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
           )}
         </div>
       </div>
+      )}
       {syncResult && (
         <div style={{ padding:"6px 1.25rem", fontSize:11, color: syncResult.error ? "#A32D2D" : "#0F6E56", background: syncResult.error ? "#FCEBEB" : "#F0F7F4", borderBottom:"0.5px solid #eee" }}>
           {syncResult.error ? `Sync failed: ${syncResult.error}` : `${syncResult.synced} change(s) synced${syncResult.failed > 0 ? `, ${syncResult.failed} failed` : ""}.`}
@@ -931,7 +934,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
             </span>
           </div>
           {!collapsed && (
-          <div style={card}>
+          <div style={{ ...card, ...(readOnly ? { opacity: 0.7, pointerEvents: "none" } : {}) }}>
             {visibleItems.map((item, idx) => (
               <div key={item.id} style={{ padding:"10px 0",borderBottom:idx===visibleItems.length-1?"none":"0.5px solid #e8e8e8",paddingBottom:idx===visibleItems.length-1?0:10 }}>
                 {item.answer_type !== "signature" && (
@@ -968,7 +971,11 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
 
       {/* SUBMIT */}
       <div style={{ padding:"1rem 1.25rem" }}>
-        {isOffline ? (
+        {readOnly ? (
+          <div style={{ fontSize:12,color:"#888",textAlign:"center",padding:"10px",background:"#f5f5f5",borderRadius:8 }}>
+            <i className="ti ti-eye" /> This audit has been submitted and is now view-only.
+          </div>
+        ) : isOffline ? (
           <div style={{ fontSize:12,color:"#888",textAlign:"center",padding:"10px",background:"#f5f5f5",borderRadius:8 }}>
             <i className="ti ti-wifi-off" /> Submitting requires a connection. Sync first once you are back online.
           </div>

@@ -1003,7 +1003,7 @@ function Templates({ profile, canManage }) {
 }
 
 // ── Audits ───────────────────────────────────────────────
-function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport, canApproveQA }) {
+function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onViewReport, canApproveQA, canAssignGuest, profile }) {
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -1018,6 +1018,10 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
   const [qaModal, setQaModal] = useState(null); // { auditId } | null
   const [qaNote, setQaNote] = useState("");
   const [qaSaving, setQaSaving] = useState(false);
+  const [assignModal, setAssignModal] = useState(null); // { auditId } | null
+  const [guestAuditors, setGuestAuditors] = useState([]);
+  const [assignedUserIds, setAssignedUserIds] = useState([]);
+  const [assignSaving, setAssignSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -1091,6 +1095,30 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
     setQaModal(null);
     setQaNote("");
     await load();
+  }
+
+  async function openAssignModal(auditId) {
+    setAssignModal({ auditId });
+    const [{ data: profiles }, { data: assignments }] = await Promise.all([
+      supabase.from("user_profiles").select("id, full_name").eq("organization_id", profile.organization_id).eq("role", "guest_auditor"),
+      supabase.from("audit_assignments").select("user_id").eq("audit_id", auditId),
+    ]);
+    setGuestAuditors(profiles || []);
+    setAssignedUserIds((assignments || []).map((a) => a.user_id));
+  }
+
+  async function toggleAssignment(userId) {
+    if (assignSaving || !assignModal) return;
+    setAssignSaving(true);
+    const isAssigned = assignedUserIds.includes(userId);
+    if (isAssigned) {
+      await supabase.from("audit_assignments").delete().eq("audit_id", assignModal.auditId).eq("user_id", userId);
+      setAssignedUserIds((prev) => prev.filter((id) => id !== userId));
+    } else {
+      await supabase.from("audit_assignments").insert([{ audit_id: assignModal.auditId, user_id: userId, assigned_by: session.user.id }]);
+      setAssignedUserIds((prev) => [...prev, userId]);
+    }
+    setAssignSaving(false);
   }
 
   const statusColor = { draft: "#EF9F27", submitted: "#1D9E75" };
@@ -1200,6 +1228,11 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
                     <i className="ti ti-clipboard-check" />
                   </button>
                 )}
+                {canAssignGuest && (
+                  <button onClick={() => openAssignModal(audit.id)} style={{ fontSize: 12, color: "#888", border: "none", background: "none", cursor: "pointer" }} title="Assign to guest auditor">
+                    <i className="ti ti-user-plus" />
+                  </button>
+                )}
                 <button onClick={() => onViewReport && onViewReport(audit.id)} style={{ fontSize: 12, color: "#1D9E75", border: "none", background: "none", cursor: "pointer" }} title="View report">
                   <i className="ti ti-eye" />
                 </button>
@@ -1267,12 +1300,37 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
             <textarea value={qaNote} onChange={(e) => setQaNote(e.target.value)} rows={3} style={{ ...s.input, resize: "vertical" }} placeholder="Explanation for your decision" />
             <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
               <button style={{ ...s.btn(true), background: "#1D9E75" }} onClick={() => handleQaDecision("approved")} disabled={qaSaving}>
-                <i className="ti ti-check" /> Goedkeuren
+                <i className="ti ti-check" /> Approve
               </button>
               <button style={{ ...s.btn(true), background: "#E24B4A" }} onClick={() => handleQaDecision("rejected")} disabled={qaSaving}>
-                <i className="ti ti-x" /> Afkeuren
+                <i className="ti ti-x" /> Reject
               </button>
               <button style={s.btn(false)} onClick={() => setQaModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guest auditor assignment modal */}
+      {assignModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 400 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Assign to guest auditor</div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Guest auditors only see audits assigned to them here — nothing else in the app.</div>
+            {guestAuditors.length === 0 ? (
+              <div style={{ fontSize: 12, color: "#BA7517", background: "#FAEEDA", border: "1px solid #EF9F27", borderRadius: 8, padding: "10px 12px" }}>
+                ⚠ No guest auditor accounts yet. Create one first under "Users" with the role "Guest auditor".
+              </div>
+            ) : (
+              guestAuditors.map((u) => (
+                <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: "0.5px solid #eee" }}>
+                  <input type="checkbox" checked={assignedUserIds.includes(u.id)} onChange={() => toggleAssignment(u.id)} disabled={assignSaving} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
+                  <span style={{ fontSize: 13 }}>{u.full_name || "Unnamed user"}</span>
+                </label>
+              ))
+            )}
+            <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+              <button style={s.btn(true)} onClick={() => setAssignModal(null)}>Done</button>
             </div>
           </div>
         </div>
@@ -1479,7 +1537,7 @@ function OrganizationSettings({ profile }) {
   );
 }
 
-const ROLE_LABEL = { admin: "Admin", manager: "Manager", auditor: "Auditor", viewer: "Viewer" };
+const ROLE_LABEL = { admin: "Admin", manager: "Manager", auditor: "Auditor", viewer: "Viewer", guest_auditor: "Guest auditor" };
 const CAN_MANAGE = ["admin", "manager"]; // who can create/edit/delete locations, templates, answer sets
 const CAN_DELETE_AUDIT = ["admin"];
 const CAN_ARCHIVE_AUDIT = ["admin", "manager"];
@@ -1497,6 +1555,7 @@ const ROLE_OPTIONS = [
   { value: "manager", label: "Manager" },
   { value: "auditor", label: "Auditor" },
   { value: "viewer", label: "Viewer" },
+  { value: "guest_auditor", label: "Guest auditor" },
 ];
 
 function Users({ profile, session }) {
@@ -1696,7 +1755,7 @@ export default function Dashboard({ session, profile, onStartAudit, onResumeAudi
       {page === "locations"  && <Locations profile={profile} canManage={canManage} />}
       {page === "answersets" && <AnswerSets profile={profile} canManage={canManage} />}
       {page === "templates"  && <Templates profile={profile} canManage={canManage} />}
-      {page === "audits"     && <Audits session={session} onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} canArchive={canArchiveAudit} onViewReport={onViewReport} canApproveQA={canArchiveAudit} />}
+      {page === "audits"     && <Audits session={session} profile={profile} onNewAudit={onStartAudit} onResumeAudit={onResumeAudit} canDelete={canDeleteAudit} canArchive={canArchiveAudit} onViewReport={onViewReport} canApproveQA={canArchiveAudit} canAssignGuest={canArchiveAudit} />}
       {page === "users"      && <Users profile={profile} session={session} />}
       {page === "org"        && <OrganizationSettings profile={profile} />}
     </div>

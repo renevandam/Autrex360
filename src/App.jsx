@@ -7,6 +7,7 @@ import AuditRun from "./AuditRun.jsx";
 import AuditReport from "./AuditReport.jsx";
 import PublicAudit from "./PublicAudit.jsx";
 import ResetPassword from "./ResetPassword.jsx";
+import GuestAuditorHome from "./GuestAuditorHome.jsx";
 
 // Detect /audit/:token in the URL path — works without any router library
 function getAuditToken() {
@@ -54,7 +55,7 @@ export default function App() {
 
   if (profileLoading) return (
     <div style={{ fontFamily: "system-ui,sans-serif", textAlign: "center", padding: "3rem", color: "#aaa" }}>
-      <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Laden...
+      <i className="ti ti-loader-2" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />Loading...
     </div>
   );
 
@@ -64,11 +65,45 @@ export default function App() {
 
   if (!profile) return (
     <div style={{ fontFamily: "system-ui,sans-serif", maxWidth: 480, margin: "4rem auto", textAlign: "center", padding: "0 1.5rem" }}>
-      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Geen organisatie gekoppeld</div>
-      <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>Je account is nog niet aan een organisatie toegewezen. Neem contact op met je beheerder.</div>
-      <button onClick={() => supabase.auth.signOut()} style={{ padding: "8px 16px", background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Uitloggen</button>
+      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No organization linked</div>
+      <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>Your account hasn't been assigned to an organization yet. Contact your administrator.</div>
+      <button onClick={() => supabase.auth.signOut()} style={{ padding: "8px 16px", background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Log out</button>
     </div>
   );
+
+  // Guest auditors get a completely separate, minimal flow: only their
+  // assigned audits, nothing else from the app (no locations, templates, etc.)
+  if (profile.role === "guest_auditor") {
+    if (screen === "run" && auditParams) return (
+      <AuditRun
+        session={session}
+        profile={profile}
+        auditId={auditParams.auditId}
+        locationId={auditParams.locationId}
+        templateId={auditParams.templateId}
+        location={auditParams.location}
+        template={auditParams.template}
+        readOnly={auditParams.readOnly}
+        onBack={() => { setAuditParams(null); setScreen("dashboard"); }}
+      />
+    );
+    return (
+      <GuestAuditorHome
+        session={session}
+        onOpenAudit={(audit) => {
+          setAuditParams({
+            auditId: audit.id,
+            locationId: audit.location_id,
+            templateId: audit.template_id,
+            location: audit.locations,
+            template: audit.audit_templates,
+            readOnly: audit.status === "submitted", // submitted audits are view-only for guest auditors
+          });
+          setScreen("run");
+        }}
+      />
+    );
+  }
 
   if (screen === "dashboard") return (
     <Dashboard
