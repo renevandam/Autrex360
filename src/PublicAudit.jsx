@@ -12,6 +12,15 @@ function nowForMode(mode) {
   return datePart;
 }
 
+function interpolateColor(hex1, hex2, fraction) {
+  const c1 = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex1);
+  const c2 = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex2);
+  if (!c1 || !c2) return hex2 || "#555";
+  const lerp = (a, b) => Math.round(parseInt(a, 16) + (parseInt(b, 16) - parseInt(a, 16)) * fraction);
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(lerp(c1[1], c2[1]))}${toHex(lerp(c1[2], c2[2]))}${toHex(lerp(c1[3], c2[3]))}`;
+}
+
 const s = {
   wrap: { fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 600, margin: "0 auto", padding: "0 0 3rem 0", background: "#f7f8fa", minHeight: "100vh" },
   header: { background: "#09325A", padding: "16px 20px", display: "flex", alignItems: "center", gap: 10 },
@@ -64,9 +73,13 @@ function AnswerInput({ item, options, value, onChange }) {
     const max = item.answer_sets.slider_max ?? 100;
     const step = item.answer_sets.slider_step ?? 1;
     const suffix = item.answer_sets.slider_mode === "percentage" ? "%" : "";
+    const startColor = item.answer_sets.slider_start_color || "#E24B4A";
+    const endColor = item.answer_sets.slider_end_color || "#1D9E75";
     const naOption = options.find((o) => o.is_na);
     const isNa = naOption && value === naOption.id;
     const numericValue = isNa ? min : (value !== undefined && value !== null && value !== "" ? Number(value) : min);
+    const fraction = max > min ? (numericValue - min) / (max - min) : 0;
+    const valueColor = interpolateColor(startColor, endColor, Math.max(0, Math.min(1, fraction)));
 
     return (
       <div style={{ marginTop: 10 }}>
@@ -75,9 +88,9 @@ function AnswerInput({ item, options, value, onChange }) {
             <input
               type="range" min={min} max={max} step={step} value={numericValue}
               onChange={(e) => onChange(e.target.value)}
-              style={{ width: "100%", accentColor: "#1D9E75" }}
+              style={{ width: "100%", accentColor: valueColor, background: `linear-gradient(to right, ${startColor}, ${endColor})`, height: 6, borderRadius: 3, appearance: "none", outline: "none" }}
             />
-            <div style={{ textAlign: "center", fontSize: 13, color: "#555", marginTop: 4, fontWeight: 600 }}>{numericValue}{suffix}</div>
+            <div style={{ textAlign: "center", fontSize: 13, color: valueColor, marginTop: 4, fontWeight: 700 }}>{numericValue}{suffix}</div>
           </>
         )}
         {naOption && (
@@ -222,7 +235,7 @@ export default function PublicAudit({ token }) {
 
       const { data: secs } = await supabase.from("template_sections").select("*").eq("template_id", auditData.template_id).order("sort_order");
       if (!secs || secs.length === 0) { setSections([]); setPhase("verify"); return; }
-      const { data: items } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step)").in("section_id", secs.map((s) => s.id)).order("sort_order");
+      const { data: items } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", secs.map((s) => s.id)).order("sort_order");
       const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
       let optionsMap = {};
       if (setIds.length > 0) {

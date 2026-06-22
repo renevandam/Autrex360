@@ -57,11 +57,11 @@ export default function AuditReport({ auditId, onBack }) {
     </div>
   );
 
-  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = data;
+  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem, rangesBySet } = data;
 
   const actionItems = [];
   sections.forEach((sec) => sec.items.forEach((item) => {
-    if (isActionItem(item, optionsBySet, responseByItem)) actionItems.push({ section: sec.name, item });
+    if (isActionItem(item, optionsBySet, responseByItem, rangesBySet)) actionItems.push({ section: sec.name, item });
   }));
 
   const scoreColor = audit.score_pct >= 80 ? "#1D9E75" : audit.score_pct >= 50 ? "#EF9F27" : "#E24B4A";
@@ -154,7 +154,7 @@ export default function AuditReport({ auditId, onBack }) {
             {section.items.length === 0 ? (
               <div style={{ fontSize: 12, color: "#aaa", fontStyle: "italic" }}>No questions in this section.</div>
             ) : section.items.filter((i) => i.answer_type !== "signature").map((item, idx) => {
-              const flagged = isActionItem(item, optionsBySet, responseByItem);
+              const flagged = isActionItem(item, optionsBySet, responseByItem, rangesBySet);
               const color = answerColor(item, optionsBySet, responseByItem);
               return (
                 <div key={item.id} style={{ padding: "8px 0", borderTop: idx === 0 ? "none" : "0.5px solid #eee" }}>

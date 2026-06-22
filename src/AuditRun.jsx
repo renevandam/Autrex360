@@ -25,6 +25,22 @@ function nowForMode(mode) {
   return datePart; // "date"
 }
 
+// Interpolates between two hex colors based on a 0-1 fraction, for the slider value text color
+function interpolateColor(hex1, hex2, fraction) {
+  const c1 = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex1);
+  const c2 = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex2);
+  if (!c1 || !c2) return hex2 || "#555";
+  const lerp = (a, b) => Math.round(parseInt(a, 16) + (parseInt(b, 16) - parseInt(a, 16)) * fraction);
+  const toHex = (n) => n.toString(16).padStart(2, "0");
+  return `#${toHex(lerp(c1[1], c2[1]))}${toHex(lerp(c1[2], c2[2]))}${toHex(lerp(c1[3], c2[3]))}`;
+}
+
+function isInActionRanges(value, ranges) {
+  if (!ranges || ranges.length === 0 || value === null || value === undefined) return false;
+  const v = Number(value);
+  return ranges.some((r) => v >= r.range_start && v <= r.range_end);
+}
+
 const card = { border: "1px solid #e0e0e0", borderRadius: 10, padding: "0.875rem 1rem", background: "#fafafa" };
 const sec = { padding: "1rem 1.25rem", borderBottom: "0.5px solid #eee" };
 const secTitle = { fontSize: 11, fontWeight: 500, color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: 6 };
@@ -308,9 +324,13 @@ function AnswerInput({ item, options, value, onChange }) {
     const max = item.answer_sets.slider_max ?? 100;
     const step = item.answer_sets.slider_step ?? 1;
     const suffix = item.answer_sets.slider_mode === "percentage" ? "%" : "";
+    const startColor = item.answer_sets.slider_start_color || "#E24B4A";
+    const endColor = item.answer_sets.slider_end_color || "#1D9E75";
     const naOption = options.find((o) => o.is_na);
     const isNa = naOption && value === naOption.id;
     const numericValue = isNa ? min : (value !== undefined && value !== null && value !== "" ? Number(value) : min);
+    const fraction = max > min ? (numericValue - min) / (max - min) : 0;
+    const valueColor = interpolateColor(startColor, endColor, Math.max(0, Math.min(1, fraction)));
 
     return (
       <div style={{ marginTop: 10 }}>
@@ -319,9 +339,9 @@ function AnswerInput({ item, options, value, onChange }) {
             <input
               type="range" min={min} max={max} step={step} value={numericValue}
               onChange={(e) => onChange(e.target.value)}
-              style={{ width: "100%", accentColor: "#1D9E75" }}
+              style={{ width: "100%", accentColor: valueColor, background: `linear-gradient(to right, ${startColor}, ${endColor})`, height: 6, borderRadius: 3, appearance: "none", outline: "none" }}
             />
-            <div style={{ textAlign: "center", fontSize: 13, color: "#555", marginTop: 4, fontWeight: 600 }}>{numericValue}{suffix}</div>
+            <div style={{ textAlign: "center", fontSize: 13, color: valueColor, marginTop: 4, fontWeight: 700 }}>{numericValue}{suffix}</div>
           </>
         )}
         {naOption && (
@@ -414,6 +434,7 @@ function AnswerInput({ item, options, value, onChange }) {
 export default function AuditRun({ session, profile, auditId, locationId, templateId, location, template, readOnly, onBack }) {
   const [sections, setSections] = useState([]);
   const [itemOptions, setItemOptions] = useState({});
+  const [sliderActionRanges, setSliderActionRanges] = useState({}); // setId -> [{range_start, range_end}]
   const [responses, setResponses] = useState({});
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("audit");
@@ -487,13 +508,19 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       }
       const { data: secs } = await supabase.from("template_sections").select("*").eq("template_id", templateId).order("sort_order");
       if (!secs || secs.length === 0) { setSections([]); setLoading(false); return; }
-      const { data: itemsRaw } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step)").in("section_id", secs.map((s) => s.id)).order("sort_order");
+      const { data: itemsRaw } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", secs.map((s) => s.id)).order("sort_order");
       const setIds = [...new Set((itemsRaw||[]).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
       let optionsMap = {};
+      let rangesMap = {};
       if (setIds.length > 0) {
-        const { data: opts } = await supabase.from("answer_options").select("*").in("set_id", setIds).order("sort_order");
+        const [{ data: opts }, { data: ranges }] = await Promise.all([
+          supabase.from("answer_options").select("*").in("set_id", setIds).order("sort_order"),
+          supabase.from("slider_action_ranges").select("*").in("set_id", setIds),
+        ]);
         (opts||[]).forEach((o) => { optionsMap[o.set_id] = optionsMap[o.set_id]||[]; optionsMap[o.set_id].push(o); });
+        (ranges||[]).forEach((r) => { rangesMap[r.set_id] = rangesMap[r.set_id]||[]; rangesMap[r.set_id].push(r); });
       }
+      setSliderActionRanges(rangesMap);
       const grouped = {};
       (itemsRaw||[]).forEach((item) => { grouped[item.section_id] = grouped[item.section_id]||[]; grouped[item.section_id].push(item); });
       const itemOpts = {};
@@ -680,7 +707,15 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const relevantMax = scoreItems.filter((i) => !naAnswers.includes(i)).reduce((sum, i) => sum + itemMaxScore(i) * itemWeight(i), 0);
   const achieved = scoreItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "").filter((i) => !isNaResponse(i)).reduce((sum, i) => sum + achievedScore(i) * itemWeight(i), 0);
   const pct = relevantMax > 0 ? Math.round((achieved / relevantMax) * 100) : 0;
-  const actionItems = allItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_action_item; });
+  const actionItems = allItems.filter((i) => {
+    if (isSliderItem(i)) {
+      if (isNaResponse(i)) return false;
+      const ranges = sliderActionRanges[i.answer_set_id] || [];
+      return isInActionRanges(responses[i.id], ranges);
+    }
+    const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]);
+    return opt?.is_action_item;
+  });
 
   // Per-section score, using the same weighting/NA logic as the overall score
   function sectionScore(section) {

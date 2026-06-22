@@ -190,8 +190,12 @@ function AnswerSetDetail({ set, canManage, onBack }) {
     min: set.slider_min ?? 0,
     max: set.slider_max ?? 100,
     step: set.slider_step ?? 1,
+    startColor: set.slider_start_color || "#E24B4A",
+    endColor: set.slider_end_color || "#1D9E75",
   });
   const [savingSliderConfig, setSavingSliderConfig] = useState(false);
+  const [actionRanges, setActionRanges] = useState([]);
+  const [newRange, setNewRange] = useState({ start: "", end: "" });
 
   async function saveSetType(newType) {
     setSetType(newType);
@@ -205,14 +209,38 @@ function AnswerSetDetail({ set, canManage, onBack }) {
       slider_min: parseFloat(sliderConfig.min),
       slider_max: parseFloat(sliderConfig.max),
       slider_step: parseFloat(sliderConfig.step),
+      slider_start_color: sliderConfig.startColor,
+      slider_end_color: sliderConfig.endColor,
     }).eq("id", set.id);
     setSavingSliderConfig(false);
+  }
+
+  async function loadActionRanges() {
+    const { data } = await supabase.from("slider_action_ranges").select("*").eq("set_id", set.id).order("range_start");
+    setActionRanges(data || []);
+  }
+
+  async function addActionRange() {
+    if (newRange.start === "" || newRange.end === "") return;
+    await supabase.from("slider_action_ranges").insert([{
+      set_id: set.id,
+      range_start: parseFloat(newRange.start),
+      range_end: parseFloat(newRange.end),
+    }]);
+    setNewRange({ start: "", end: "" });
+    await loadActionRanges();
+  }
+
+  async function removeActionRange(id) {
+    await supabase.from("slider_action_ranges").delete().eq("id", id);
+    await loadActionRanges();
   }
 
   async function load() {
     setLoading(true);
     const { data } = await supabase.from("answer_options").select("*").eq("set_id", set.id).order("sort_order");
     setOptions(data || []);
+    await loadActionRanges();
     setLoading(false);
   }
   useEffect(() => { load(); }, [set.id]);
@@ -341,7 +369,23 @@ function AnswerSetDetail({ set, canManage, onBack }) {
               <div style={s.label}>Step</div>
               <input disabled={!canManage} type="number" value={sliderConfig.step} onChange={(e) => setSliderConfig((c) => ({ ...c, step: e.target.value }))} style={s.input} placeholder="e.g. 1, 5, 10" />
             </div>
+            <div />
+            <div>
+              <div style={s.label}>Start color</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input disabled={!canManage} type="color" value={sliderConfig.startColor} onChange={(e) => setSliderConfig((c) => ({ ...c, startColor: e.target.value }))} style={{ width: 40, height: 30, border: "1px solid #ddd", borderRadius: 6, cursor: canManage ? "pointer" : "default", padding: 2 }} />
+                <span style={{ fontSize: 11, color: "#888" }}>{sliderConfig.startColor}</span>
+              </div>
+            </div>
+            <div>
+              <div style={s.label}>End color</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input disabled={!canManage} type="color" value={sliderConfig.endColor} onChange={(e) => setSliderConfig((c) => ({ ...c, endColor: e.target.value }))} style={{ width: 40, height: 30, border: "1px solid #ddd", borderRadius: 6, cursor: canManage ? "pointer" : "default", padding: 2 }} />
+                <span style={{ fontSize: 11, color: "#888" }}>{sliderConfig.endColor}</span>
+              </div>
+            </div>
           </div>
+          <div style={{ marginTop: 10, height: 8, borderRadius: 4, background: `linear-gradient(to right, ${sliderConfig.startColor}, ${sliderConfig.endColor})` }} />
           <div style={{ fontSize: 11, color: "#aaa", marginTop: 8 }}>
             A respondent drags the slider between {sliderConfig.min} and {sliderConfig.max}{sliderConfig.mode === "percentage" ? "%" : ""}, in steps of {sliderConfig.step}. The slider's value becomes the score directly. Add an N/A option below if this question should sometimes not count.
           </div>
@@ -349,6 +393,36 @@ function AnswerSetDetail({ set, canManage, onBack }) {
             <button style={{ ...s.btn(true), marginTop: 12 }} onClick={saveSliderConfig} disabled={savingSliderConfig}>
               <i className="ti ti-check" /> {savingSliderConfig ? "Saving..." : "Save scale"}
             </button>
+          )}
+        </div>
+      )}
+
+      {setType === "slider" && (
+        <div style={{ ...s.card, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Action item ranges (optional)</div>
+          <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>When the slider value falls within one of these ranges, the question is flagged as an action item — just like the "Action item" flag on a button option.</div>
+          {actionRanges.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              {actionRanges.map((r) => (
+                <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "0.5px solid #eee" }}>
+                  <span style={{ fontSize: 13, color: "#A32D2D" }}><i className="ti ti-alert-triangle" style={{ fontSize: 12 }} /> From {r.range_start} to {r.range_end}{sliderConfig.mode === "percentage" ? "%" : ""}</span>
+                  {canManage && <button onClick={() => removeActionRange(r.id)} style={{ fontSize: 11, color: "#ccc", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-x" /></button>}
+                </div>
+              ))}
+            </div>
+          )}
+          {canManage && (
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}>
+                <div style={s.label}>From</div>
+                <input type="number" value={newRange.start} onChange={(e) => setNewRange((r) => ({ ...r, start: e.target.value }))} style={s.input} placeholder="e.g. 0" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={s.label}>To</div>
+                <input type="number" value={newRange.end} onChange={(e) => setNewRange((r) => ({ ...r, end: e.target.value }))} style={s.input} placeholder="e.g. 30" />
+              </div>
+              <button style={s.btnSm} onClick={addActionRange}><i className="ti ti-plus" /> Add range</button>
+            </div>
           )}
         </div>
       )}

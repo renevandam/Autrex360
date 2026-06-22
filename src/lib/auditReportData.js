@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export const STATUS_LABEL = { draft: "Concept", submitted: "Ingediend" };
+export const STATUS_LABEL = { draft: "Draft", submitted: "Submitted" };
 
 // Fetch everything needed to render a full audit report
 export async function loadAuditReportData(auditId) {
@@ -9,7 +9,7 @@ export async function loadAuditReportData(auditId) {
     .select("*, locations(*), audit_templates(id,name,description)")
     .eq("id", auditId)
     .single();
-  if (!audit) throw new Error("Audit niet gevonden");
+  if (!audit) throw new Error("Audit not found");
 
   const { data: organization } = audit.organization_id
     ? await supabase.from("organizations").select("name, address, logo_url, primary_color").eq("id", audit.organization_id).single()
@@ -23,17 +23,18 @@ export async function loadAuditReportData(auditId) {
 
   const sectionIds = (sections || []).map((s) => s.id);
   const { data: items } = sectionIds.length
-    ? await supabase.from("template_items").select("*, answer_sets(name,set_type,slider_mode,slider_min,slider_max,slider_step)").in("section_id", sectionIds).order("sort_order")
+    ? await supabase.from("template_items").select("*, answer_sets(name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", sectionIds).order("sort_order")
     : { data: [] };
 
   const itemIds = (items || []).map((i) => i.id);
   const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
 
-  const [{ data: options }, { data: responses }, { data: stockRows }, { data: photoRows }] = await Promise.all([
+  const [{ data: options }, { data: responses }, { data: stockRows }, { data: photoRows }, { data: ranges }] = await Promise.all([
     setIds.length ? supabase.from("answer_options").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
     itemIds.length ? supabase.from("audit_responses").select("*").in("item_id", itemIds).eq("audit_id", auditId) : Promise.resolve({ data: [] }),
     itemIds.length ? supabase.from("stock_checks").select("*").in("item_id", itemIds).eq("audit_id", auditId).order("row_order") : Promise.resolve({ data: [] }),
     itemIds.length ? supabase.from("audit_photos").select("*").in("item_id", itemIds).eq("audit_id", auditId).order("created_at") : Promise.resolve({ data: [] }),
+    setIds.length ? supabase.from("slider_action_ranges").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
   ]);
 
   const optionsBySet = {};
@@ -47,6 +48,8 @@ export async function loadAuditReportData(auditId) {
     photosByItem[p.item_id] = photosByItem[p.item_id] || [];
     photosByItem[p.item_id].push({ ...p, url: supabase.storage.from("audit-photos").getPublicUrl(p.storage_path).data.publicUrl });
   });
+  const rangesBySet = {};
+  (ranges || []).forEach((r) => { rangesBySet[r.set_id] = rangesBySet[r.set_id] || []; rangesBySet[r.set_id].push(r); });
 
   const itemsBySection = {};
   (items || []).forEach((it) => { itemsBySection[it.section_id] = itemsBySection[it.section_id] || []; itemsBySection[it.section_id].push(it); });
@@ -59,6 +62,7 @@ export async function loadAuditReportData(auditId) {
     responseByItem,
     stockByItem,
     photosByItem,
+    rangesBySet,
   };
 }
 
@@ -90,8 +94,18 @@ export function answerLabel(item, optionsBySet, responseByItem) {
   return String(raw);
 }
 
-export function isActionItem(item, optionsBySet, responseByItem) {
-  if (item.answer_type !== "score" || !item.answer_set_id) return false;
+export function isActionItem(item, optionsBySet, responseByItem, rangesBySet) {
+  if (item.answer_type !== "score") return false;
+  if (item.answer_sets?.set_type === "slider") {
+    const raw = responseByItem[item.id];
+    if (raw === undefined || raw === null || raw === "") return false;
+    const opts = item.answer_set_id ? (optionsBySet[item.answer_set_id] || []) : [];
+    if (opts.some((o) => o.is_na && o.id === raw)) return false; // N/A never counts as an action item
+    const ranges = (rangesBySet && item.answer_set_id) ? (rangesBySet[item.answer_set_id] || []) : [];
+    const v = Number(raw);
+    return ranges.some((r) => v >= r.range_start && v <= r.range_end);
+  }
+  if (!item.answer_set_id) return false;
   const opts = optionsBySet[item.answer_set_id] || [];
   const match = opts.find((o) => o.id === responseByItem[item.id]);
   return !!match?.is_action_item;

@@ -17,7 +17,7 @@ function hexToRgb(hex, fallback) {
 }
 
 export async function exportAuditToPdf(auditId) {
-  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem } = await loadAuditReportData(auditId);
+  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem, rangesBySet } = await loadAuditReportData(auditId);
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -130,7 +130,7 @@ export async function exportAuditToPdf(auditId) {
   // ── Action items summary ──
   const actionItems = [];
   sections.forEach((sec) => sec.items.forEach((item) => {
-    if (isActionItem(item, optionsBySet, responseByItem)) actionItems.push({ section: sec.name, item });
+    if (isActionItem(item, optionsBySet, responseByItem, rangesBySet)) actionItems.push({ section: sec.name, item });
   }));
 
   if (actionItems.length > 0) {
@@ -220,7 +220,7 @@ export async function exportAuditToPdf(auditId) {
         });
       } else {
         const answer = answerLabel(item, optionsBySet, responseByItem);
-        const flagged = isActionItem(item, optionsBySet, responseByItem);
+        const flagged = isActionItem(item, optionsBySet, responseByItem, rangesBySet);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...(flagged ? RED : GREEN));
         const wrappedAnswer = doc.splitTextToSize(answer, 150);
