@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { exportAuditToPdf } from "./lib/exportPdf";
+import { exportAuditToPrintForm } from "./lib/exportPrintForm";
 import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, countPending } from "./lib/offlineStore";
 import { syncAuditToServer } from "./lib/offlineSync";
 import { uploadAuditPhoto, getPhotosForItem, deleteAuditPhoto } from "./lib/photoStorage";
@@ -392,6 +393,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const [editDraft, setEditDraft] = useState({ ...locData });
   const [submitting, setSubmitting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [printingForm, setPrintingForm] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [snapshotStockRows, setSnapshotStockRows] = useState([]);
   const [hasOfflineSnapshot, setHasOfflineSnapshot] = useState(false);
@@ -676,6 +678,31 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
     setExportingPdf(false);
   }
 
+  async function handlePrint() {
+    if (printingForm || !auditId) return;
+    setPrintingForm(true);
+    try {
+      if (isOffline) {
+        const snapshot = await getAuditSnapshot(auditId);
+        if (!snapshot) throw new Error("No offline snapshot available - download the audit while online first.");
+        await exportAuditToPrintForm(auditId, {
+          locData: snapshot.locData,
+          templateName: template?.name,
+          auditorName: session?.user?.email,
+          auditDate: new Date().toISOString().slice(0, 10),
+          sections: snapshot.sections,
+          itemOptions: snapshot.itemOptions,
+          organization: null, // org branding isn't part of the snapshot; falls back to a generic header
+        });
+      } else {
+        await exportAuditToPrintForm(auditId);
+      }
+    } catch (e) {
+      alert("Could not generate the print form: " + e.message);
+    }
+    setPrintingForm(false);
+  }
+
   async function handleSubmit() {
     if (submitting) return;
     setSubmitting(true);
@@ -767,6 +794,9 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
             <button onClick={handleExportPdf} disabled={exportingPdf} style={{ fontSize:12,color:"#378ADD",border:"0.5px solid #378ADD",borderRadius:6,padding:"4px 9px",background:"none",cursor:exportingPdf?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
               <i className="ti ti-file-type-pdf" /> {exportingPdf ? "Generating..." : "PDF"}
+            </button>
+            <button onClick={handlePrint} disabled={printingForm} title="Printable blank form (paper fallback)" style={{ fontSize:12,color:"#888",border:"0.5px solid #ccc",borderRadius:6,padding:"4px 9px",background:"none",cursor:printingForm?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4 }}>
+              <i className="ti ti-printer" /> {printingForm ? "Generating..." : "Print"}
             </button>
             <div style={{ fontSize:11,color:"#888" }}>{session.user.email}</div>
           </div>

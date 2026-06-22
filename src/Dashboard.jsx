@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { exportAuditToPdf } from "./lib/exportPdf";
+import { exportAuditToPrintForm } from "./lib/exportPrintForm";
 
 const NAV = [
   { id: "home",       label: "Dashboard",   icon: "ti-home" },
@@ -1008,6 +1009,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
   const [showArchived, setShowArchived] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all"); // all | draft | submitted | pending | approved | rejected
   const [exportingId, setExportingId] = useState(null);
+  const [printingId, setPrintingId] = useState(null);
   const [linkModal, setLinkModal] = useState(null); // { auditId } | null
   const [linkEmail, setLinkEmail] = useState("");
   const [generatedLink, setGeneratedLink] = useState(null);
@@ -1049,6 +1051,17 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
       alert("Could not generate PDF: " + e.message);
     }
     setExportingId(null);
+  }
+
+  async function handlePrint(id) {
+    if (printingId) return;
+    setPrintingId(id);
+    try {
+      await exportAuditToPrintForm(id);
+    } catch (e) {
+      alert("Could not generate the print form: " + e.message);
+    }
+    setPrintingId(null);
   }
 
   async function remove(id) {
@@ -1195,6 +1208,9 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
                 </button>
                 <button onClick={() => handleExport(audit.id)} disabled={exportingId === audit.id} style={{ fontSize: 12, color: "#378ADD", border: "none", background: "none", cursor: exportingId === audit.id ? "not-allowed" : "pointer" }} title="Export as PDF">
                   <i className={`ti ${exportingId === audit.id ? "ti-loader-2" : "ti-file-type-pdf"}`} />
+                </button>
+                <button onClick={() => handlePrint(audit.id)} disabled={printingId === audit.id} style={{ fontSize: 12, color: "#888", border: "none", background: "none", cursor: printingId === audit.id ? "not-allowed" : "pointer" }} title="Printable blank form (paper fallback)">
+                  <i className={`ti ${printingId === audit.id ? "ti-loader-2" : "ti-printer"}`} />
                 </button>
                 {canArchive && (
                   <button onClick={() => toggleArchive(audit.id, !audit.archived)} style={{ fontSize: 12, color: "#aaa", border: "none", background: "none", cursor: "pointer" }} title={audit.archived ? "Restore" : "Archive"}>
