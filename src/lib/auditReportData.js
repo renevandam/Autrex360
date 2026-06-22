@@ -23,7 +23,7 @@ export async function loadAuditReportData(auditId) {
 
   const sectionIds = (sections || []).map((s) => s.id);
   const { data: items } = sectionIds.length
-    ? await supabase.from("template_items").select("*, answer_sets(name)").in("section_id", sectionIds).order("sort_order")
+    ? await supabase.from("template_items").select("*, answer_sets(name,set_type,slider_mode,slider_min,slider_max,slider_step)").in("section_id", sectionIds).order("sort_order")
     : { data: [] };
 
   const itemIds = (items || []).map((i) => i.id);
@@ -64,21 +64,28 @@ export async function loadAuditReportData(auditId) {
 
 export function answerLabel(item, optionsBySet, responseByItem) {
   const raw = responseByItem[item.id];
-  if (raw === undefined || raw === null || raw === "") return "— Niet ingevuld —";
+  if (raw === undefined || raw === null || raw === "") return "— Not filled in —";
+  if (item.answer_type === "score" && item.answer_sets?.set_type === "slider") {
+    const opts = item.answer_set_id ? (optionsBySet[item.answer_set_id] || []) : [];
+    const naOption = opts.find((o) => o.is_na && o.id === raw);
+    if (naOption) return naOption.label;
+    const suffix = item.answer_sets.slider_mode === "percentage" ? "%" : "";
+    return `${raw}${suffix}`;
+  }
   if (item.answer_type === "score" && item.answer_set_id) {
     const opts = optionsBySet[item.answer_set_id] || [];
     const match = opts.find((o) => o.id === raw);
     return match ? match.label : raw;
   }
-  if (item.answer_type === "checkbox") return raw === "true" ? "Ja" : "Nee";
+  if (item.answer_type === "checkbox") return raw === "true" ? "Yes" : "No";
   if (item.answer_type === "slider") return `${raw}%`;
   if (item.answer_type === "datetime") {
     const mode = item.datetime_mode || "date";
     if (mode === "time") return raw; // already HH:MM
     const d = new Date(mode === "date" ? `${raw}T00:00` : raw);
     if (isNaN(d.getTime())) return raw;
-    if (mode === "date") return d.toLocaleDateString("nl-NL");
-    return d.toLocaleString("nl-NL", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    if (mode === "date") return d.toLocaleDateString("en-US");
+    return d.toLocaleString("en-US", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
   }
   return String(raw);
 }

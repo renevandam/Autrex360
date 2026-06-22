@@ -59,6 +59,37 @@ function AnswerInput({ item, options, value, onChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 
+  if (type === "score" && item.answer_sets?.set_type === "slider") {
+    const min = item.answer_sets.slider_min ?? 0;
+    const max = item.answer_sets.slider_max ?? 100;
+    const step = item.answer_sets.slider_step ?? 1;
+    const suffix = item.answer_sets.slider_mode === "percentage" ? "%" : "";
+    const naOption = options.find((o) => o.is_na);
+    const isNa = naOption && value === naOption.id;
+    const numericValue = isNa ? min : (value !== undefined && value !== null && value !== "" ? Number(value) : min);
+
+    return (
+      <div style={{ marginTop: 10 }}>
+        {!isNa && (
+          <>
+            <input
+              type="range" min={min} max={max} step={step} value={numericValue}
+              onChange={(e) => onChange(e.target.value)}
+              style={{ width: "100%", accentColor: "#1D9E75" }}
+            />
+            <div style={{ textAlign: "center", fontSize: 13, color: "#555", marginTop: 4, fontWeight: 600 }}>{numericValue}{suffix}</div>
+          </>
+        )}
+        {naOption && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={isNa} onChange={(e) => onChange(e.target.checked ? naOption.id : String(min))} style={{ width: 14, height: 14, accentColor: "#378ADD" }} />
+            <span style={{ fontSize: 12, color: "#888" }}>{naOption.label}</span>
+          </label>
+        )}
+      </div>
+    );
+  }
+
   if (type === "score") {
     return (
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
@@ -191,7 +222,7 @@ export default function PublicAudit({ token }) {
 
       const { data: secs } = await supabase.from("template_sections").select("*").eq("template_id", auditData.template_id).order("sort_order");
       if (!secs || secs.length === 0) { setSections([]); setPhase("verify"); return; }
-      const { data: items } = await supabase.from("template_items").select("*, answer_sets(id,name)").in("section_id", secs.map((s) => s.id)).order("sort_order");
+      const { data: items } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step)").in("section_id", secs.map((s) => s.id)).order("sort_order");
       const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
       let optionsMap = {};
       if (setIds.length > 0) {

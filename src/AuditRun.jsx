@@ -303,6 +303,37 @@ function AnswerInput({ item, options, value, onChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 
+  if (type === "score" && item.answer_sets?.set_type === "slider") {
+    const min = item.answer_sets.slider_min ?? 0;
+    const max = item.answer_sets.slider_max ?? 100;
+    const step = item.answer_sets.slider_step ?? 1;
+    const suffix = item.answer_sets.slider_mode === "percentage" ? "%" : "";
+    const naOption = options.find((o) => o.is_na);
+    const isNa = naOption && value === naOption.id;
+    const numericValue = isNa ? min : (value !== undefined && value !== null && value !== "" ? Number(value) : min);
+
+    return (
+      <div style={{ marginTop: 10 }}>
+        {!isNa && (
+          <>
+            <input
+              type="range" min={min} max={max} step={step} value={numericValue}
+              onChange={(e) => onChange(e.target.value)}
+              style={{ width: "100%", accentColor: "#1D9E75" }}
+            />
+            <div style={{ textAlign: "center", fontSize: 13, color: "#555", marginTop: 4, fontWeight: 600 }}>{numericValue}{suffix}</div>
+          </>
+        )}
+        {naOption && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={isNa} onChange={(e) => onChange(e.target.checked ? naOption.id : String(min))} style={{ width: 14, height: 14, accentColor: "#378ADD" }} />
+            <span style={{ fontSize: 12, color: "#888" }}>{naOption.label}</span>
+          </label>
+        )}
+      </div>
+    );
+  }
+
   if (type === "score" && options.length > 0) {
     return (
       <div style={{ display:"flex",gap:5,flexWrap:"wrap",marginTop:7 }}>
@@ -456,7 +487,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       }
       const { data: secs } = await supabase.from("template_sections").select("*").eq("template_id", templateId).order("sort_order");
       if (!secs || secs.length === 0) { setSections([]); setLoading(false); return; }
-      const { data: itemsRaw } = await supabase.from("template_items").select("*, answer_sets(id,name)").in("section_id", secs.map((s) => s.id)).order("sort_order");
+      const { data: itemsRaw } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step)").in("section_id", secs.map((s) => s.id)).order("sort_order");
       const setIds = [...new Set((itemsRaw||[]).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
       let optionsMap = {};
       if (setIds.length > 0) {
@@ -618,20 +649,45 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
 
   // Score
   const itemWeight = (i) => i.weight ? Number(i.weight) : 1;
-  const scoreItems = allItems.filter((i) => (i.answer_type === "score" || !i.answer_type) && (itemOptions[i.id]||[]).length > 0);
-  const naAnswers = scoreItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_na; });
-  const itemMaxScore = (i) => Math.max(0, ...((itemOptions[i.id]||[]).filter((o) => !o.is_na && o.score !== null).map((o) => o.score)));
+  const isSliderItem = (i) => i.answer_sets?.set_type === "slider";
+  const scoreItems = allItems.filter((i) => (i.answer_type === "score" || !i.answer_type) && (isSliderItem(i) || (itemOptions[i.id]||[]).length > 0));
+
+  // For a slider item, "is this response N/A" means the response equals the N/A option's id.
+  // For a button item, it means the selected option itself has is_na set.
+  function isNaResponse(i) {
+    const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]);
+    return !!opt?.is_na;
+  }
+
+  // Slider max score is simply its configured max (or 100 for percentage); button max is the highest scoring option.
+  const itemMaxScore = (i) => {
+    if (isSliderItem(i)) return Number(i.answer_sets.slider_max ?? 100);
+    return Math.max(0, ...((itemOptions[i.id]||[]).filter((o) => !o.is_na && o.score !== null).map((o) => o.score)));
+  };
+
+  // Slider achieved score is the numeric response value itself; button achieved score is the selected option's score.
+  function achievedScore(i) {
+    if (isSliderItem(i)) {
+      const raw = responses[i.id];
+      if (raw === undefined || raw === null || raw === "" || isNaResponse(i)) return 0;
+      return Number(raw);
+    }
+    const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]);
+    return opt?.score || 0;
+  }
+
+  const naAnswers = scoreItems.filter((i) => isNaResponse(i));
   const relevantMax = scoreItems.filter((i) => !naAnswers.includes(i)).reduce((sum, i) => sum + itemMaxScore(i) * itemWeight(i), 0);
-  const achieved = scoreItems.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && !opt.is_na; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0)*itemWeight(i); }, 0);
+  const achieved = scoreItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "").filter((i) => !isNaResponse(i)).reduce((sum, i) => sum + achievedScore(i) * itemWeight(i), 0);
   const pct = relevantMax > 0 ? Math.round((achieved / relevantMax) * 100) : 0;
   const actionItems = allItems.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_action_item; });
 
   // Per-section score, using the same weighting/NA logic as the overall score
   function sectionScore(section) {
-    const items = section.items.filter(isVisible).filter((i) => (i.answer_type === "score" || !i.answer_type) && (itemOptions[i.id]||[]).length > 0);
-    const na = items.filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt?.is_na; });
+    const items = section.items.filter(isVisible).filter((i) => (i.answer_type === "score" || !i.answer_type) && (isSliderItem(i) || (itemOptions[i.id]||[]).length > 0));
+    const na = items.filter((i) => isNaResponse(i));
     const max = items.filter((i) => !na.includes(i)).reduce((sum, i) => sum + itemMaxScore(i) * itemWeight(i), 0);
-    const ach = items.filter((i) => responses[i.id]).filter((i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return opt && !opt.is_na; }).reduce((sum,i) => { const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]); return sum+(opt?.score||0)*itemWeight(i); }, 0);
+    const ach = items.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "").filter((i) => !isNaResponse(i)).reduce((sum, i) => sum + achievedScore(i) * itemWeight(i), 0);
     return { max, achieved: ach, pct: max > 0 ? Math.round((ach / max) * 100) : null };
   }
 

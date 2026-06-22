@@ -184,6 +184,30 @@ function AnswerSetDetail({ set, canManage, onBack }) {
   const [setName, setSetName] = useState(set.name);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(set.name);
+  const [setType, setSetType] = useState(set.set_type || "buttons");
+  const [sliderConfig, setSliderConfig] = useState({
+    mode: set.slider_mode || "numeric",
+    min: set.slider_min ?? 0,
+    max: set.slider_max ?? 100,
+    step: set.slider_step ?? 1,
+  });
+  const [savingSliderConfig, setSavingSliderConfig] = useState(false);
+
+  async function saveSetType(newType) {
+    setSetType(newType);
+    await supabase.from("answer_sets").update({ set_type: newType }).eq("id", set.id);
+  }
+
+  async function saveSliderConfig() {
+    setSavingSliderConfig(true);
+    await supabase.from("answer_sets").update({
+      slider_mode: sliderConfig.mode,
+      slider_min: parseFloat(sliderConfig.min),
+      slider_max: parseFloat(sliderConfig.max),
+      slider_step: parseFloat(sliderConfig.step),
+    }).eq("id", set.id);
+    setSavingSliderConfig(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -278,6 +302,60 @@ function AnswerSetDetail({ set, canManage, onBack }) {
         )}
         <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Manage the options in this answer set</div>
       </div>
+
+      {canManage && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={s.label}>Display type</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => saveSetType("buttons")} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, border: setType === "buttons" ? "1.5px solid #1D9E75" : "1px solid #ddd", background: setType === "buttons" ? "#E1F5EE" : "white", color: setType === "buttons" ? "#085041" : "#555", cursor: "pointer" }}>
+              <i className="ti ti-list-check" /> Buttons
+            </button>
+            <button onClick={() => saveSetType("slider")} style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, border: setType === "slider" ? "1.5px solid #1D9E75" : "1px solid #ddd", background: setType === "slider" ? "#E1F5EE" : "white", color: setType === "slider" ? "#085041" : "#555", cursor: "pointer" }}>
+              <i className="ti ti-adjustments-horizontal" /> Slider
+            </button>
+          </div>
+        </div>
+      )}
+
+      {setType === "slider" && (
+        <div style={{ ...s.card, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Slider scale</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={s.label}>Type</div>
+              <select disabled={!canManage} value={sliderConfig.mode} onChange={(e) => setSliderConfig((c) => ({ ...c, mode: e.target.value }))} style={s.select}>
+                <option value="numeric">Number</option>
+                <option value="percentage">Percentage</option>
+              </select>
+            </div>
+            <div />
+            <div>
+              <div style={s.label}>Start</div>
+              <input disabled={!canManage} type="number" value={sliderConfig.min} onChange={(e) => setSliderConfig((c) => ({ ...c, min: e.target.value }))} style={s.input} />
+            </div>
+            <div>
+              <div style={s.label}>End</div>
+              <input disabled={!canManage} type="number" value={sliderConfig.max} onChange={(e) => setSliderConfig((c) => ({ ...c, max: e.target.value }))} style={s.input} />
+            </div>
+            <div>
+              <div style={s.label}>Step</div>
+              <input disabled={!canManage} type="number" value={sliderConfig.step} onChange={(e) => setSliderConfig((c) => ({ ...c, step: e.target.value }))} style={s.input} placeholder="e.g. 1, 5, 10" />
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "#aaa", marginTop: 8 }}>
+            A respondent drags the slider between {sliderConfig.min} and {sliderConfig.max}{sliderConfig.mode === "percentage" ? "%" : ""}, in steps of {sliderConfig.step}. The slider's value becomes the score directly. Add an N/A option below if this question should sometimes not count.
+          </div>
+          {canManage && (
+            <button style={{ ...s.btn(true), marginTop: 12 }} onClick={saveSliderConfig} disabled={savingSliderConfig}>
+              <i className="ti ti-check" /> {savingSliderConfig ? "Saving..." : "Save scale"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {setType === "slider" && (
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: "#555" }}>N/A option (optional)</div>
+      )}
 
       {loading ? <div style={s.empty}>Loading...</div> : (
         <div style={s.card}>
@@ -391,7 +469,7 @@ function AnswerSets({ profile, canManage }) {
   async function save() {
     if (!name.trim()) return;
     setSaving(true);
-    const { data } = await supabase.from("answer_sets").insert([{ name, organization_id: profile.organization_id }]).select().single();
+    const { data } = await supabase.from("answer_sets").insert([{ name, organization_id: profile.organization_id, set_type: "buttons" }]).select().single();
     setName(""); setShowForm(false);
     await load();
     setSaving(false);
@@ -1565,6 +1643,7 @@ function Users({ profile, session }) {
   const [form, setForm] = useState({ email: "", fullName: "", role: "auditor" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1660,10 +1739,16 @@ function Users({ profile, session }) {
     }
   }
 
+  const visibleUsers = users.filter((u) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return (u.full_name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q);
+  });
+
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
-        <span>Users ({users.length})</span>
+        <span>Users ({visibleUsers.length})</span>
         <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
           <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Close" : "Add"}
         </button>
@@ -1679,7 +1764,7 @@ function Users({ profile, session }) {
         <div style={{ ...s.card, border: "1px solid #1D9E75", marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#1D9E75" }}>New user</div>
           <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>The user will receive an email with a secure link to set their own password.</div>
-          <div style={s.label}>E-mailadres *</div>
+          <div style={s.label}>Email address *</div>
           <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={s.input} placeholder="name@company.com" />
           <div style={{ ...s.label, marginTop: 8 }}>Full name</div>
           <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} style={s.input} placeholder="Optional" />
@@ -1696,9 +1781,19 @@ function Users({ profile, session }) {
         </div>
       )}
 
+      <div style={{ marginBottom: 14, position: "relative" }}>
+        <i className="ti ti-search" style={{ position: "absolute", left: 11, top: 10, fontSize: 14, color: "#aaa" }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ ...s.input, paddingLeft: 32 }}
+          placeholder="Search by name or email..."
+        />
+      </div>
+
       {loading ? <div style={s.empty}>Loading...</div>
-        : users.length === 0 ? <div style={s.empty}><i className="ti ti-users" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />No users yet.</div>
-        : users.map((u) => (
+        : visibleUsers.length === 0 ? <div style={s.empty}><i className="ti ti-users" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "No users found for this search." : "No users yet."}</div>
+        : visibleUsers.map((u) => (
           <div key={u.id} style={{ ...s.card, opacity: u.is_active === false ? 0.6 : 1 }}>
             <div style={s.row}>
               <div>
