@@ -1576,7 +1576,7 @@ function Users({ profile, session }) {
         body: JSON.stringify({ organizationId: profile.organization_id, requesterId: session.user.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      if (!res.ok) throw new Error(data.error || "Unknown error");
       setUsers(data.users || []);
     } catch (e) {
       setError(e.message);
@@ -1599,7 +1599,7 @@ function Users({ profile, session }) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      if (!res.ok) throw new Error(data.error || "Unknown error");
       setForm({ email: "", fullName: "", role: "auditor" });
       setShowForm(false);
       await load();
@@ -1618,7 +1618,7 @@ function Users({ profile, session }) {
         body: JSON.stringify({ action: "updateRole", targetUserId: userId, newRole, organizationId: profile.organization_id, requesterId: session.user.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      if (!res.ok) throw new Error(data.error || "Unknown error");
       await load();
     } catch (e) {
       setError(e.message);
@@ -1635,7 +1635,25 @@ function Users({ profile, session }) {
         body: JSON.stringify({ action: "delete", targetUserId: userId, organizationId: profile.organization_id, requesterId: session.user.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Onbekende fout");
+      if (!res.ok) throw new Error(data.error || "Unknown error");
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function toggleActive(userId, currentlyActive) {
+    const action = currentlyActive ? "deactivate" : "reactivate";
+    if (currentlyActive && !confirm("Deactivate this user? They will no longer be able to log in, but their history and data stay intact.")) return;
+    setError(null);
+    try {
+      const res = await fetch("/api/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, targetUserId: userId, organizationId: profile.organization_id, requesterId: session.user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Unknown error");
       await load();
     } catch (e) {
       setError(e.message);
@@ -1681,28 +1699,40 @@ function Users({ profile, session }) {
       {loading ? <div style={s.empty}>Loading...</div>
         : users.length === 0 ? <div style={s.empty}><i className="ti ti-users" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />No users yet.</div>
         : users.map((u) => (
-          <div key={u.id} style={s.card}>
+          <div key={u.id} style={{ ...s.card, opacity: u.is_active === false ? 0.6 : 1 }}>
             <div style={s.row}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || u.email || "Unknown"}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{u.email}</div>
                 <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>
                   <i className="ti ti-clock" style={{ fontSize: 11 }} /> Last login: {u.last_sign_in_at
-                    ? new Date(u.last_sign_in_at).toLocaleString("nl-NL", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                    ? new Date(u.last_sign_in_at).toLocaleString("en-US", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
                     : "Never logged in"}
                 </div>
-                {u.must_change_password && (
-                  <span style={{ fontSize: 10, fontWeight: 500, display: "inline-block", marginTop: 4, padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806" }}>
-                    <i className="ti ti-clock" style={{ fontSize: 10 }} /> Invitation not yet activated
-                  </span>
-                )}
+                <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                  {u.must_change_password && (
+                    <span style={{ fontSize: 10, fontWeight: 500, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#FAEEDA", color: "#633806" }}>
+                      <i className="ti ti-clock" style={{ fontSize: 10 }} /> Invitation not yet activated
+                    </span>
+                  )}
+                  {u.is_active === false && (
+                    <span style={{ fontSize: 10, fontWeight: 500, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#FCEBEB", color: "#A32D2D" }}>
+                      <i className="ti ti-ban" style={{ fontSize: 10 }} /> Deactivated
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} disabled={u.id === session.user.id} style={{ fontSize: 12, border: "1px solid #ddd", borderRadius: 6, padding: "4px 8px", background: "white" }}>
                   {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
                 {u.id !== session.user.id && (
-                  <button onClick={() => removeUser(u.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                  <>
+                    <button onClick={() => toggleActive(u.id, u.is_active !== false)} title={u.is_active === false ? "Reactivate" : "Deactivate"} style={{ fontSize: 11, color: u.is_active === false ? "#1D9E75" : "#888", border: "none", background: "none", cursor: "pointer" }}>
+                      <i className={`ti ${u.is_active === false ? "ti-rotate" : "ti-ban"}`} />
+                    </button>
+                    <button onClick={() => removeUser(u.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>
+                  </>
                 )}
               </div>
             </div>
