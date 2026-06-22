@@ -233,12 +233,28 @@ export default function PublicAudit({ token }) {
       if (!auditData) { setPhase("error"); return; }
       setAudit(auditData);
 
-      const { data: secs } = await supabase.from("template_sections").select("*").eq("template_id", auditData.template_id).order("sort_order");
+      let secs, items;
+      if (auditData.template_snapshot) {
+        // Frozen at the moment this audit started - never affected by later template edits.
+        secs = auditData.template_snapshot.sections.map(({ items: _items, ...sec }) => sec);
+        items = auditData.template_snapshot.sections.flatMap((sec) =>
+          sec.items.map((it) => ({ ...it, answer_sets: it.answer_set || null }))
+        );
+      } else {
+        // Fallback for audits created before snapshotting existed - reads live data as before.
+        const { data: liveSecs } = await supabase.from("template_sections").select("*").eq("template_id", auditData.template_id).order("sort_order");
+        secs = liveSecs;
+        if (!secs || secs.length === 0) { setSections([]); setPhase("verify"); return; }
+        const { data: liveItems } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", secs.map((s) => s.id)).order("sort_order");
+        items = liveItems;
+      }
       if (!secs || secs.length === 0) { setSections([]); setPhase("verify"); return; }
-      const { data: items } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", secs.map((s) => s.id)).order("sort_order");
+
       const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
       let optionsMap = {};
-      if (setIds.length > 0) {
+      if (auditData.template_snapshot) {
+        (items || []).forEach((it) => { if (it.answer_sets) optionsMap[it.answer_sets.id] = it.answer_sets.options || []; });
+      } else if (setIds.length > 0) {
         const { data: opts } = await supabase.from("answer_options").select("*").in("set_id", setIds).order("sort_order");
         (opts || []).forEach((o) => { optionsMap[o.set_id] = optionsMap[o.set_id] || []; optionsMap[o.set_id].push(o); });
       }

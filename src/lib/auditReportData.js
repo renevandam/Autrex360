@@ -15,30 +15,64 @@ export async function loadAuditReportData(auditId) {
     ? await supabase.from("organizations").select("name, address, logo_url, primary_color").eq("id", audit.organization_id).single()
     : { data: null };
 
-  const { data: sections } = await supabase
-    .from("template_sections")
-    .select("*")
-    .eq("template_id", audit.template_id)
-    .order("sort_order");
+  const itemIdsForResponses = [];
+  let sectionsResult, optionsBySet, rangesBySet;
 
-  const sectionIds = (sections || []).map((s) => s.id);
-  const { data: items } = sectionIds.length
-    ? await supabase.from("template_items").select("*, answer_sets(name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", sectionIds).order("sort_order")
-    : { data: [] };
+  if (audit.template_snapshot) {
+    // Use the audit's own frozen structure - never affected by later template edits.
+    optionsBySet = {};
+    rangesBySet = {};
+    sectionsResult = audit.template_snapshot.sections.map((sec) => ({
+      ...sec,
+      items: sec.items.map((it) => {
+        itemIdsForResponses.push(it.id);
+        if (it.answer_set) {
+          optionsBySet[it.answer_set.id] = it.answer_set.options || [];
+          rangesBySet[it.answer_set.id] = it.answer_set.actionRanges || [];
+        }
+        // Normalize to "answer_sets" (matching the live-data shape) so answerLabel/isActionItem work unchanged
+        return { ...it, answer_sets: it.answer_set || null };
+      }),
+    }));
+  } else {
+    // Fallback for audits created before snapshotting existed - reads live data as before.
+    const { data: sections } = await supabase
+      .from("template_sections")
+      .select("*")
+      .eq("template_id", audit.template_id)
+      .order("sort_order");
 
-  const itemIds = (items || []).map((i) => i.id);
-  const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
+    const sectionIds = (sections || []).map((s) => s.id);
+    const { data: items } = sectionIds.length
+      ? await supabase.from("template_items").select("*, answer_sets(name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", sectionIds).order("sort_order")
+      : { data: [] };
 
-  const [{ data: options }, { data: responses }, { data: stockRows }, { data: photoRows }, { data: ranges }] = await Promise.all([
-    setIds.length ? supabase.from("answer_options").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
-    itemIds.length ? supabase.from("audit_responses").select("*").in("item_id", itemIds).eq("audit_id", auditId) : Promise.resolve({ data: [] }),
-    itemIds.length ? supabase.from("stock_checks").select("*").in("item_id", itemIds).eq("audit_id", auditId).order("row_order") : Promise.resolve({ data: [] }),
-    itemIds.length ? supabase.from("audit_photos").select("*").in("item_id", itemIds).eq("audit_id", auditId).order("created_at") : Promise.resolve({ data: [] }),
-    setIds.length ? supabase.from("slider_action_ranges").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
+    const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
+    const [{ data: liveOptions }, { data: liveRanges }] = await Promise.all([
+      setIds.length ? supabase.from("answer_options").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
+      setIds.length ? supabase.from("slider_action_ranges").select("*").in("set_id", setIds) : Promise.resolve({ data: [] }),
+    ]);
+
+    optionsBySet = {};
+    (liveOptions || []).forEach((o) => { optionsBySet[o.set_id] = optionsBySet[o.set_id] || []; optionsBySet[o.set_id].push(o); });
+    rangesBySet = {};
+    (liveRanges || []).forEach((r) => { rangesBySet[r.set_id] = rangesBySet[r.set_id] || []; rangesBySet[r.set_id].push(r); });
+
+    const itemsBySection = {};
+    (items || []).forEach((it) => {
+      itemIdsForResponses.push(it.id);
+      itemsBySection[it.section_id] = itemsBySection[it.section_id] || [];
+      itemsBySection[it.section_id].push(it);
+    });
+    sectionsResult = (sections || []).map((sec) => ({ ...sec, items: itemsBySection[sec.id] || [] }));
+  }
+
+  const [{ data: responses }, { data: stockRows }, { data: photoRows }] = await Promise.all([
+    itemIdsForResponses.length ? supabase.from("audit_responses").select("*").in("item_id", itemIdsForResponses).eq("audit_id", auditId) : Promise.resolve({ data: [] }),
+    itemIdsForResponses.length ? supabase.from("stock_checks").select("*").in("item_id", itemIdsForResponses).eq("audit_id", auditId).order("row_order") : Promise.resolve({ data: [] }),
+    itemIdsForResponses.length ? supabase.from("audit_photos").select("*").in("item_id", itemIdsForResponses).eq("audit_id", auditId).order("created_at") : Promise.resolve({ data: [] }),
   ]);
 
-  const optionsBySet = {};
-  (options || []).forEach((o) => { optionsBySet[o.set_id] = optionsBySet[o.set_id] || []; optionsBySet[o.set_id].push(o); });
   const responseByItem = {};
   (responses || []).forEach((r) => { responseByItem[r.item_id] = r.response; });
   const stockByItem = {};
@@ -48,16 +82,11 @@ export async function loadAuditReportData(auditId) {
     photosByItem[p.item_id] = photosByItem[p.item_id] || [];
     photosByItem[p.item_id].push({ ...p, url: supabase.storage.from("audit-photos").getPublicUrl(p.storage_path).data.publicUrl });
   });
-  const rangesBySet = {};
-  (ranges || []).forEach((r) => { rangesBySet[r.set_id] = rangesBySet[r.set_id] || []; rangesBySet[r.set_id].push(r); });
-
-  const itemsBySection = {};
-  (items || []).forEach((it) => { itemsBySection[it.section_id] = itemsBySection[it.section_id] || []; itemsBySection[it.section_id].push(it); });
 
   return {
     audit,
     organization,
-    sections: (sections || []).map((sec) => ({ ...sec, items: itemsBySection[sec.id] || [] })),
+    sections: sectionsResult,
     optionsBySet,
     responseByItem,
     stockByItem,

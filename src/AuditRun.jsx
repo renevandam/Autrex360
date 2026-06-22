@@ -506,20 +506,50 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
           setLocData(d); setEditDraft(d);
         }
       }
-      const { data: secs } = await supabase.from("template_sections").select("*").eq("template_id", templateId).order("sort_order");
-      if (!secs || secs.length === 0) { setSections([]); setLoading(false); return; }
-      const { data: itemsRaw } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", secs.map((s) => s.id)).order("sort_order");
-      const setIds = [...new Set((itemsRaw||[]).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
-      let optionsMap = {};
-      let rangesMap = {};
-      if (setIds.length > 0) {
-        const [{ data: opts }, { data: ranges }] = await Promise.all([
-          supabase.from("answer_options").select("*").in("set_id", setIds).order("sort_order"),
-          supabase.from("slider_action_ranges").select("*").in("set_id", setIds),
-        ]);
-        (opts||[]).forEach((o) => { optionsMap[o.set_id] = optionsMap[o.set_id]||[]; optionsMap[o.set_id].push(o); });
-        (ranges||[]).forEach((r) => { rangesMap[r.set_id] = rangesMap[r.set_id]||[]; rangesMap[r.set_id].push(r); });
+
+      // Prefer the audit's own frozen snapshot, so later edits to the live
+      // template/answer sets never change this audit again - draft or submitted.
+      let snapshotData = null;
+      let auditRowForSnapshot = null;
+      if (auditId) {
+        const { data } = await supabase.from("audits").select("template_snapshot, address_verified, address_override").eq("id", auditId).single();
+        auditRowForSnapshot = data;
+        snapshotData = data?.template_snapshot || null;
       }
+
+      let secs, itemsRaw, optionsMap = {}, rangesMap = {};
+
+      if (snapshotData) {
+        // Reconstruct the same in-memory shape the rest of this component expects,
+        // but sourced entirely from the frozen snapshot instead of live tables.
+        secs = snapshotData.sections.map(({ items, ...sec }) => sec);
+        itemsRaw = snapshotData.sections.flatMap((sec) =>
+          sec.items.map((it) => ({ ...it, answer_sets: it.answer_set ? { ...it.answer_set } : null }))
+        );
+        itemsRaw.forEach((item) => {
+          if (item.answer_set) {
+            optionsMap[item.answer_set.id] = item.answer_set.options || [];
+            rangesMap[item.answer_set.id] = item.answer_set.actionRanges || [];
+          }
+        });
+      } else {
+        // Fallback for audits created before snapshotting existed - reads live data as before.
+        const { data: liveSecs } = await supabase.from("template_sections").select("*").eq("template_id", templateId).order("sort_order");
+        secs = liveSecs;
+        if (!secs || secs.length === 0) { setSections([]); setLoading(false); return; }
+        const { data: liveItems } = await supabase.from("template_items").select("*, answer_sets(id,name,set_type,slider_mode,slider_min,slider_max,slider_step,slider_start_color,slider_end_color)").in("section_id", secs.map((s) => s.id)).order("sort_order");
+        itemsRaw = liveItems;
+        const setIds = [...new Set((itemsRaw||[]).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
+        if (setIds.length > 0) {
+          const [{ data: opts }, { data: ranges }] = await Promise.all([
+            supabase.from("answer_options").select("*").in("set_id", setIds).order("sort_order"),
+            supabase.from("slider_action_ranges").select("*").in("set_id", setIds),
+          ]);
+          (opts||[]).forEach((o) => { optionsMap[o.set_id] = optionsMap[o.set_id]||[]; optionsMap[o.set_id].push(o); });
+          (ranges||[]).forEach((r) => { rangesMap[r.set_id] = rangesMap[r.set_id]||[]; rangesMap[r.set_id].push(r); });
+        }
+      }
+
       setSliderActionRanges(rangesMap);
       const grouped = {};
       (itemsRaw||[]).forEach((item) => { grouped[item.section_id] = grouped[item.section_id]||[]; grouped[item.section_id].push(item); });
@@ -536,7 +566,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
           savedResponses.forEach((r) => { restored[r.item_id] = r.response; });
           setResponses(restored);
         }
-        const { data: auditRow } = await supabase.from("audits").select("address_verified, address_override").eq("id", auditId).single();
+        const auditRow = auditRowForSnapshot;
         if (auditRow) {
           setAddrVerified(!!auditRow.address_verified);
           if (auditRow.address_override) {

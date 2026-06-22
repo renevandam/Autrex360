@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
+import { buildTemplateSnapshot } from "./lib/templateSnapshot";
 
 export default function AuditStart({ session, profile, onStart, onBack }) {
   const [locations, setLocations] = useState([]);
@@ -28,27 +29,37 @@ export default function AuditStart({ session, profile, onStart, onBack }) {
   async function handleStart() {
     if (starting) return;
     setStarting(true);
-    const { data: audit, error } = await supabase.from("audits").insert([{
-      location_id: needsLocation ? locationId : null,
-      template_id: templateId,
-      organization_id: profile.organization_id,
-      created_by: session.user.id,
-      auditor_name: session.user.email,
-      audit_date: new Date().toISOString().slice(0, 10),
-      status: "draft",
-    }]).select().single();
-    setStarting(false);
-    if (error || !audit) {
-      alert("Could not create the audit: " + (error?.message || "unknown error"));
-      return;
+    try {
+      // Freeze the template's current structure into this audit, so later
+      // edits to the live template never change this audit again.
+      const snapshot = await buildTemplateSnapshot(templateId);
+      const { data: audit, error } = await supabase.from("audits").insert([{
+        location_id: needsLocation ? locationId : null,
+        template_id: templateId,
+        organization_id: profile.organization_id,
+        created_by: session.user.id,
+        auditor_name: session.user.email,
+        audit_date: new Date().toISOString().slice(0, 10),
+        status: "draft",
+        template_snapshot: snapshot,
+      }]).select().single();
+      if (error || !audit) {
+        alert("Could not create the audit: " + (error?.message || "unknown error"));
+        setStarting(false);
+        return;
+      }
+      setStarting(false);
+      onStart({
+        auditId: audit.id,
+        locationId: needsLocation ? locationId : null,
+        templateId,
+        location: needsLocation ? locations.find((l) => l.id === locationId) : null,
+        template: selectedTemplate,
+      });
+    } catch (e) {
+      setStarting(false);
+      alert("Could not create the audit: " + e.message);
     }
-    onStart({
-      auditId: audit.id,
-      locationId: needsLocation ? locationId : null,
-      templateId,
-      location: needsLocation ? locations.find((l) => l.id === locationId) : null,
-      template: selectedTemplate,
-    });
   }
 
   const s = {

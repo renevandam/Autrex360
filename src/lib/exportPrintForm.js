@@ -41,36 +41,52 @@ async function loadPrintFormData(auditId, offlineSnapshot) {
     ? await supabase.from("organizations").select("name, address, logo_url, primary_color").eq("id", audit.organization_id).single()
     : { data: null };
 
-  const { data: sections } = await supabase
-    .from("template_sections")
-    .select("*")
-    .eq("template_id", audit.template_id)
-    .order("sort_order");
+  let sectionsResult, itemOptions;
 
-  const sectionIds = (sections || []).map((s) => s.id);
-  const { data: items } = sectionIds.length
-    ? await supabase.from("template_items").select("*").in("section_id", sectionIds).order("sort_order")
-    : { data: [] };
+  if (audit.template_snapshot) {
+    // Frozen at the moment this audit started - never affected by later template edits.
+    itemOptions = {};
+    sectionsResult = audit.template_snapshot.sections.map((sec) => ({
+      ...sec,
+      items: sec.items.map((it) => {
+        if (it.answer_set) itemOptions[it.id] = it.answer_set.options || [];
+        return it;
+      }),
+    }));
+  } else {
+    // Fallback for audits created before snapshotting existed - reads live data as before.
+    const { data: sections } = await supabase
+      .from("template_sections")
+      .select("*")
+      .eq("template_id", audit.template_id)
+      .order("sort_order");
 
-  const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
-  const { data: options } = setIds.length
-    ? await supabase.from("answer_options").select("*").in("set_id", setIds).order("sort_order")
-    : { data: [] };
+    const sectionIds = (sections || []).map((s) => s.id);
+    const { data: items } = sectionIds.length
+      ? await supabase.from("template_items").select("*").in("section_id", sectionIds).order("sort_order")
+      : { data: [] };
 
-  const optionsBySet = {};
-  (options || []).forEach((o) => { optionsBySet[o.set_id] = optionsBySet[o.set_id] || []; optionsBySet[o.set_id].push(o); });
-  const itemOptions = {};
-  (items || []).forEach((it) => { itemOptions[it.id] = it.answer_set_id ? (optionsBySet[it.answer_set_id] || []) : []; });
+    const setIds = [...new Set((items || []).filter((i) => i.answer_set_id).map((i) => i.answer_set_id))];
+    const { data: options } = setIds.length
+      ? await supabase.from("answer_options").select("*").in("set_id", setIds).order("sort_order")
+      : { data: [] };
 
-  const itemsBySection = {};
-  (items || []).forEach((it) => { itemsBySection[it.section_id] = itemsBySection[it.section_id] || []; itemsBySection[it.section_id].push(it); });
+    const optionsBySet = {};
+    (options || []).forEach((o) => { optionsBySet[o.set_id] = optionsBySet[o.set_id] || []; optionsBySet[o.set_id].push(o); });
+    itemOptions = {};
+    (items || []).forEach((it) => { itemOptions[it.id] = it.answer_set_id ? (optionsBySet[it.answer_set_id] || []) : []; });
+
+    const itemsBySection = {};
+    (items || []).forEach((it) => { itemsBySection[it.section_id] = itemsBySection[it.section_id] || []; itemsBySection[it.section_id].push(it); });
+    sectionsResult = (sections || []).map((sec) => ({ ...sec, items: itemsBySection[sec.id] || [] }));
+  }
 
   return {
     locationName: audit.locations?.name || null,
     templateName: audit.audit_templates?.name || null,
     auditorName: audit.auditor_name || null,
     auditDate: audit.audit_date,
-    sections: (sections || []).map((sec) => ({ ...sec, items: itemsBySection[sec.id] || [] })),
+    sections: sectionsResult,
     itemOptions,
     organization,
   };
