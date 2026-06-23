@@ -1215,6 +1215,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
   const [guestAuditors, setGuestAuditors] = useState([]);
   const [assignedUserIds, setAssignedUserIds] = useState([]);
   const [assignSaving, setAssignSaving] = useState(false);
+  const [assignSearch, setAssignSearch] = useState("");
 
   async function load() {
     setLoading(true);
@@ -1292,6 +1293,7 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
 
   async function openAssignModal(auditId) {
     setAssignModal({ auditId });
+    setAssignSearch("");
     const [{ data: profiles }, { data: assignments }] = await Promise.all([
       supabase.from("user_profiles").select("id, full_name").eq("organization_id", profile.organization_id).eq("role", "guest_auditor"),
       supabase.from("audit_assignments").select("user_id").eq("audit_id", auditId),
@@ -1310,6 +1312,23 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
     } else {
       await supabase.from("audit_assignments").insert([{ audit_id: assignModal.auditId, user_id: userId, assigned_by: session.user.id }]);
       setAssignedUserIds((prev) => [...prev, userId]);
+    }
+    setAssignSaving(false);
+  }
+
+  // Assigns or unassigns every guest auditor currently matching the search filter in one go,
+  // so a whole group can be added/removed without clicking each checkbox individually.
+  async function toggleAssignAllVisible(visibleUsers, shouldAssign) {
+    if (assignSaving || !assignModal) return;
+    setAssignSaving(true);
+    const targets = visibleUsers.filter((u) => shouldAssign ? !assignedUserIds.includes(u.id) : assignedUserIds.includes(u.id));
+    if (shouldAssign) {
+      await supabase.from("audit_assignments").insert(targets.map((u) => ({ audit_id: assignModal.auditId, user_id: u.id, assigned_by: session.user.id })));
+      setAssignedUserIds((prev) => [...new Set([...prev, ...targets.map((u) => u.id)])]);
+    } else {
+      await supabase.from("audit_assignments").delete().eq("audit_id", assignModal.auditId).in("user_id", targets.map((u) => u.id));
+      const targetIds = new Set(targets.map((u) => u.id));
+      setAssignedUserIds((prev) => prev.filter((id) => !targetIds.has(id)));
     }
     setAssignSaving(false);
   }
@@ -1505,7 +1524,10 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
       )}
 
       {/* Guest auditor assignment modal */}
-      {assignModal && (
+      {assignModal && (() => {
+        const visibleGuestAuditors = guestAuditors.filter((u) => !assignSearch.trim() || (u.full_name || "").toLowerCase().includes(assignSearch.trim().toLowerCase()));
+        const allVisibleAssigned = visibleGuestAuditors.length > 0 && visibleGuestAuditors.every((u) => assignedUserIds.includes(u.id));
+        return (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
           <div style={{ background: "white", borderRadius: 12, padding: 20, width: "100%", maxWidth: 400 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#09325A", marginBottom: 4 }}>Assign to guest auditor</div>
@@ -1515,19 +1537,41 @@ function Audits({ session, onNewAudit, onResumeAudit, canDelete, canArchive, onV
                 ⚠ No guest auditor accounts yet. Create one first under "Users" with the role "Guest auditor".
               </div>
             ) : (
-              guestAuditors.map((u) => (
-                <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: "0.5px solid #eee" }}>
-                  <input type="checkbox" checked={assignedUserIds.includes(u.id)} onChange={() => toggleAssignment(u.id)} disabled={assignSaving} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
-                  <span style={{ fontSize: 13 }}>{u.full_name || "Unnamed user"}</span>
-                </label>
-              ))
+              <>
+                <div style={{ position: "relative", marginBottom: 10 }}>
+                  <i className="ti ti-search" style={{ position: "absolute", left: 9, top: 9, fontSize: 13, color: "#aaa" }} />
+                  <input
+                    value={assignSearch}
+                    onChange={(e) => setAssignSearch(e.target.value)}
+                    style={{ ...s.input, paddingLeft: 28, fontSize: 12 }}
+                    placeholder="Search by name..."
+                  />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: "#888" }}>{visibleGuestAuditors.length} {visibleGuestAuditors.length === 1 ? "person" : "people"}</span>
+                  <button onClick={() => toggleAssignAllVisible(visibleGuestAuditors, !allVisibleAssigned)} disabled={assignSaving || visibleGuestAuditors.length === 0} style={{ fontSize: 11, color: "#1D9E75", border: "none", background: "none", cursor: "pointer", fontWeight: 500 }}>
+                    {allVisibleAssigned ? "Deselect all" : "Select all"}
+                  </button>
+                </div>
+                {visibleGuestAuditors.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#aaa", padding: "10px 0" }}>No guest auditors match this search.</div>
+                ) : (
+                  visibleGuestAuditors.map((u) => (
+                    <label key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: "0.5px solid #eee" }}>
+                      <input type="checkbox" checked={assignedUserIds.includes(u.id)} onChange={() => toggleAssignment(u.id)} disabled={assignSaving} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
+                      <span style={{ fontSize: 13 }}>{u.full_name || "Unnamed user"}</span>
+                    </label>
+                  ))
+                )}
+              </>
             )}
             <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
               <button style={s.btn(true)} onClick={() => setAssignModal(null)}>Done</button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
