@@ -1031,6 +1031,7 @@ function Templates({ profile, canManage }) {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
   const [duplicatingId, setDuplicatingId] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -1049,6 +1050,11 @@ function Templates({ profile, canManage }) {
   async function remove(id) {
     if (!confirm("Delete this template?")) return;
     await supabase.from("audit_templates").delete().eq("id", id); await load();
+  }
+
+  async function toggleArchive(id, archived) {
+    await supabase.from("audit_templates").update({ archived }).eq("id", id);
+    await load();
   }
 
   async function duplicateTemplate(tpl) {
@@ -1105,17 +1111,24 @@ function Templates({ profile, canManage }) {
 
   if (selected) return <TemplateDetail template={selected} canManage={canManage} onBack={() => { setSelected(null); load(); }} />;
 
-  const visibleTemplates = templates.filter((t) => !search.trim() || t.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const visibleTemplates = templates
+    .filter((t) => !!t.archived === showArchived)
+    .filter((t) => !search.trim() || t.name.toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
     <div style={s.page}>
       <div style={s.sTitle}>
         <span>Templates ({visibleTemplates.length})</span>
-        {canManage && (
-          <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
-            <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Close" : "Add"}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={s.btn(false)} onClick={() => setShowArchived((v) => !v)}>
+            <i className={`ti ${showArchived ? "ti-file-description" : "ti-archive"}`} /> {showArchived ? "Active templates" : "Archived"}
           </button>
-        )}
+          {canManage && (
+            <button style={s.btn(true)} onClick={() => setShowForm((v) => !v)}>
+              <i className={`ti ${showForm ? "ti-x" : "ti-plus"}`} /> {showForm ? "Close" : "Add"}
+            </button>
+          )}
+        </div>
       </div>
       <div style={{ marginBottom: 14, position: "relative" }}>
         <i className="ti ti-search" style={{ position: "absolute", left: 11, top: 10, fontSize: 14, color: "#aaa" }} />
@@ -1149,7 +1162,7 @@ function Templates({ profile, canManage }) {
         </div>
       )}
       {loading ? <div style={s.empty}>Loading...</div>
-        : visibleTemplates.length === 0 ? <div style={s.empty}><i className="ti ti-file-description" style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{search.trim() ? "No templates found for this search." : "No templates yet."}</div>
+        : visibleTemplates.length === 0 ? <div style={s.empty}><i className={`ti ${showArchived ? "ti-archive" : "ti-file-description"}`} style={{ fontSize: 32, display: "block", marginBottom: 8 }} />{showArchived ? "No archived templates." : search.trim() ? "No templates found for this search." : "No templates yet."}</div>
         : visibleTemplates.map((tpl) => (
           <div key={tpl.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => setSelected(tpl)}>
             <div style={s.row}>
@@ -1161,13 +1174,18 @@ function Templates({ profile, canManage }) {
                   {tpl.requires_location === false && <span style={s.badge("#888")}>No location</span>}
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(e) => e.stopPropagation()}>
                 {canManage && (
-                  <button onClick={(e) => { e.stopPropagation(); duplicateTemplate(tpl); }} disabled={duplicatingId === tpl.id} style={{ fontSize: 11, color: "#378ADD", border: "none", background: "none", cursor: duplicatingId === tpl.id ? "not-allowed" : "pointer" }} title="Duplicate">
+                  <button onClick={() => duplicateTemplate(tpl)} disabled={duplicatingId === tpl.id} style={{ fontSize: 11, color: "#378ADD", border: "none", background: "none", cursor: duplicatingId === tpl.id ? "not-allowed" : "pointer" }} title="Duplicate">
                     <i className={`ti ${duplicatingId === tpl.id ? "ti-loader-2" : "ti-copy"}`} />
                   </button>
                 )}
-                {canManage && <button onClick={(e) => { e.stopPropagation(); remove(tpl.id); }} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
+                {canManage && (
+                  <button onClick={() => toggleArchive(tpl.id, !tpl.archived)} style={{ fontSize: 11, color: "#888", border: "none", background: "none", cursor: "pointer" }} title={tpl.archived ? "Restore" : "Archive"}>
+                    <i className={`ti ${tpl.archived ? "ti-archive-off" : "ti-archive"}`} />
+                  </button>
+                )}
+                {canManage && <button onClick={() => remove(tpl.id)} style={{ fontSize: 11, color: "#aaa", border: "none", background: "none", cursor: "pointer" }}><i className="ti ti-trash" /></button>}
                 <i className="ti ti-chevron-right" style={{ color: "#ccc" }} />
               </div>
             </div>
