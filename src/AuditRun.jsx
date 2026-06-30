@@ -96,7 +96,7 @@ function SignaturePad({ label }) {
 // ── Stock take table ──────────────────────────────────────
 // ── Info icon with click-to-show popover (not included in reports/PDF) ──
 // ── Photo upload: camera capture or file picker, with thumbnails + lightbox ──
-function PhotoUpload({ auditId, itemId }) {
+function PhotoUpload({ auditId, itemId, required, onCountChange }) {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -114,6 +114,11 @@ function PhotoUpload({ auditId, itemId }) {
     }
     load();
   }, [auditId, itemId]);
+
+  // Let the parent (which owns submit validation) know how many photos this question currently has
+  useEffect(() => {
+    onCountChange?.(itemId, photos.length);
+  }, [photos.length, itemId]);
 
   async function handleFiles(fileList) {
     if (!fileList || fileList.length === 0 || !auditId) return;
@@ -140,6 +145,12 @@ function PhotoUpload({ auditId, itemId }) {
 
   return (
     <div style={{ marginTop: 8 }}>
+      {required && (
+        <div style={{ fontSize: 11, marginBottom: 5, display: "flex", alignItems: "center", gap: 4, color: photos.length > 0 ? "#1D9E75" : "#A32D2D" }}>
+          <i className={`ti ${photos.length > 0 ? "ti-circle-check" : "ti-alert-triangle"}`} />
+          {photos.length > 0 ? "Photo added" : "Photo required"}
+        </div>
+      )}
       {error && <div style={{ fontSize: 11, color: "#E24B4A", marginBottom: 6 }}>{error}</div>}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         {photos.map((photo) => (
@@ -436,6 +447,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const [itemOptions, setItemOptions] = useState({});
   const [sliderActionRanges, setSliderActionRanges] = useState({}); // setId -> [{range_start, range_end}]
   const [responses, setResponses] = useState({});
+  const [photoCounts, setPhotoCounts] = useState({}); // itemId -> number of uploaded photos, used to enforce "photo required" questions
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("audit");
   const [addrVerified, setAddrVerified] = useState(false);
@@ -827,6 +839,18 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
 
   async function handleSubmit() {
     if (submitting) return;
+
+    // Block submission while any visible "photo required" question still has zero photos
+    const missingPhotoItem = allItems.find(
+      (i) => i.foto_verplicht && i.answer_type !== "signature" && i.answer_type !== "stock_take" && i.answer_type !== "datetime" && !(photoCounts[i.id] > 0)
+    );
+    if (missingPhotoItem) {
+      setCollapsedSections((prev) => ({ ...prev, [missingPhotoItem.section_id]: false }));
+      scrollToSection(missingPhotoItem.section_id);
+      alert(`A photo is required for: "${missingPhotoItem.label}". Please add one before submitting.`);
+      return;
+    }
+
     setSubmitting(true);
     if (auditId) {
       // Check whether this organization requires QA approval before an audit counts as fully done
@@ -1080,7 +1104,12 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
                   />
                 )}
                 {item.answer_type !== "signature" && item.answer_type !== "stock_take" && item.answer_type !== "datetime" && (
-                  <PhotoUpload auditId={auditId} itemId={item.id} />
+                  <PhotoUpload
+                    auditId={auditId}
+                    itemId={item.id}
+                    required={!!item.foto_verplicht}
+                    onCountChange={(id, count) => setPhotoCounts((c) => (c[id] === count ? c : { ...c, [id]: count }))}
+                  />
                 )}
               </div>
             ))}

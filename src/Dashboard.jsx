@@ -705,7 +705,12 @@ function TemplateDetail({ template, canManage, onBack }) {
     await load();
   }
 
-  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5", datetime_mode: "date" };
+  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5", datetime_mode: "date", foto_verplicht: false };
+
+  // Photo upload only applies to question types that actually render the PhotoUpload control in AuditRun
+  function supportsPhoto(answerType) {
+    return answerType !== "signature" && answerType !== "stock_take" && answerType !== "datetime";
+  }
 
   function toggleItemForm(sectionId) {
     setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
@@ -737,6 +742,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_col3_label: form.stock_col3_label || "Aantal",
       stock_max_rows: form.stock_max_rows ? parseInt(form.stock_max_rows) : 5,
       datetime_mode: form.datetime_mode || "date",
+      foto_verplicht: supportsPhoto(form.answer_type) ? !!form.foto_verplicht : false,
       sort_order: (items[sectionId] || []).length,
     }]);
     setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, open: false } }));
@@ -772,6 +778,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_col3_label: item.stock_col3_label || "Aantal",
       stock_max_rows: item.stock_max_rows !== null && item.stock_max_rows !== undefined ? String(item.stock_max_rows) : "5",
       datetime_mode: item.datetime_mode || "date",
+      foto_verplicht: !!item.foto_verplicht,
       _sectionId: item.section_id,
     });
   }
@@ -792,6 +799,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_col3_label: editForm.stock_col3_label || "Aantal",
       stock_max_rows: editForm.stock_max_rows ? parseInt(editForm.stock_max_rows) : 5,
       datetime_mode: editForm.datetime_mode || "date",
+      foto_verplicht: supportsPhoto(editForm.answer_type) ? !!editForm.foto_verplicht : false,
     }).eq("id", editingItemId);
     setEditingItemId(null); setEditForm({});
     await load();
@@ -876,6 +884,12 @@ function TemplateDetail({ template, canManage, onBack }) {
                       )}
                       <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
                       <input type="number" step="0.5" min="0.5" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                      {supportsPhoto(editForm.answer_type) && (
+                        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                          <input type="checkbox" checked={!!editForm.foto_verplicht} onChange={(e) => setEditForm((f) => ({ ...f, foto_verplicht: e.target.checked }))} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
+                          <span style={{ fontSize: 12, color: "#555" }}>Photo required to answer this question</span>
+                        </div>
+                      )}
                       <div style={{ ...s.label, marginTop: 8 }}>Only show if... (optional)</div>
                       <select value={editForm.depends_on_item_id} onChange={(e) => setEditForm((f) => ({ ...f, depends_on_item_id: e.target.value, depends_on_value: "" }))} style={s.select}>
                         <option value="">— Always show —</option>
@@ -913,6 +927,11 @@ function TemplateDetail({ template, canManage, onBack }) {
                           {item.depends_on_item_id && (
                             <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#E6F1FB", color: "#0C447C", fontWeight: 500 }}>
                               <i className="ti ti-git-branch" style={{ fontSize: 10 }} /> Conditional
+                            </span>
+                          )}
+                          {item.foto_verplicht && (
+                            <span style={{ fontSize: 11, display: "inline-block", padding: "2px 7px", borderRadius: 10, background: "#FBE8E6", color: "#A32D2D", fontWeight: 500 }}>
+                              <i className="ti ti-camera" style={{ fontSize: 10 }} /> Photo required
                             </span>
                           )}
                         </div>
@@ -975,6 +994,12 @@ function TemplateDetail({ template, canManage, onBack }) {
                   )}
                   <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
                   <input type="number" step="0.5" min="0.5" value={newItemForms[section.id]?.weight || "1"} onChange={(e) => updateItemForm(section.id, "weight", e.target.value)} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                  {supportsPhoto(newItemForms[section.id]?.answer_type || "score") && (
+                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                      <input type="checkbox" checked={!!newItemForms[section.id]?.foto_verplicht} onChange={(e) => updateItemForm(section.id, "foto_verplicht", e.target.checked)} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
+                      <span style={{ fontSize: 12, color: "#555" }}>Photo required to answer this question</span>
+                    </div>
+                  )}
                   <div style={{ ...s.label, marginTop: 8 }}>Only show if... (optional)</div>
                   <select value={newItemForms[section.id]?.depends_on_item_id || ""} onChange={(e) => updateItemForm(section.id, "depends_on_item_id", e.target.value)} style={s.select}>
                     <option value="">— Always show —</option>
