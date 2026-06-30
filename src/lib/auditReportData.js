@@ -146,3 +146,17 @@ export function answerColor(item, optionsBySet, responseByItem) {
   const match = opts.find((o) => o.id === responseByItem[item.id]);
   return match?.color || null;
 }
+
+// Builds the full list of action items for a report/PDF: every flagged question, plus a synthetic
+// entry when the location address was edited during the audit (addresses often come straight from a
+// CRM import, so an on-site correction is worth flagging for someone to fix at the source).
+export function getActionItems(sections, optionsBySet, responseByItem, rangesBySet, audit) {
+  const result = [];
+  if (audit?.address_override) {
+    result.push({ section: "Location", addressChange: true });
+  }
+  sections.forEach((sec) => sec.items.forEach((item) => {
+    if (isActionItem(item, optionsBySet, responseByItem, rangesBySet)) result.push({ section: sec.name, item });
+  }));
+  return result;
+}

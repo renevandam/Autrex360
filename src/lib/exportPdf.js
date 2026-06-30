@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import { loadAuditReportData, answerLabel, isActionItem, STATUS_LABEL } from "./auditReportData";
+import { loadAuditReportData, answerLabel, isActionItem, getActionItems, STATUS_LABEL } from "./auditReportData";
 
 const BRAND_BLUE = [11, 110, 193];   // #0B6EC1
 const BRAND_DARK = [9, 50, 90];      // #09325A
@@ -128,20 +128,19 @@ export async function exportAuditToPdf(auditId) {
   }
 
   // ── Action items summary ──
-  const actionItems = [];
-  sections.forEach((sec) => sec.items.forEach((item) => {
-    if (isActionItem(item, optionsBySet, responseByItem, rangesBySet)) actionItems.push({ section: sec.name, item });
-  }));
+  const actionItems = getActionItems(sections, optionsBySet, responseByItem, rangesBySet, audit);
 
   if (actionItems.length > 0) {
     y += 6;
     heading(`Action items (${actionItems.length})`, 13, RED);
-    actionItems.forEach(({ section, item }) => {
+    actionItems.forEach((entry) => {
       ensureSpace(16);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(20, 20, 20);
-      const text = `• [${section}] ${item.label} — ${answerLabel(item, optionsBySet, responseByItem)}`;
+      const text = entry.addressChange
+        ? `• [${entry.section}] Address was edited during the audit — check against the CRM source data`
+        : `• [${entry.section}] ${entry.item.label} — ${answerLabel(entry.item, optionsBySet, responseByItem)}`;
       const wrapped = doc.splitTextToSize(text, pageWidth - margin * 2);
       doc.text(wrapped, margin, y);
       y += wrapped.length * 13 + 4;

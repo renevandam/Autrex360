@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { loadAuditReportData, answerLabel, isActionItem, answerColor, STATUS_LABEL } from "./lib/auditReportData";
+import { loadAuditReportData, answerLabel, isActionItem, answerColor, getActionItems, STATUS_LABEL } from "./lib/auditReportData";
 import { exportAuditToPdf } from "./lib/exportPdf";
 
 export default function AuditReport({ auditId, onBack }) {
@@ -59,10 +59,7 @@ export default function AuditReport({ auditId, onBack }) {
 
   const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem, rangesBySet } = data;
 
-  const actionItems = [];
-  sections.forEach((sec) => sec.items.forEach((item) => {
-    if (isActionItem(item, optionsBySet, responseByItem, rangesBySet)) actionItems.push({ section: sec.name, item });
-  }));
+  const actionItems = getActionItems(sections, optionsBySet, responseByItem, rangesBySet, audit);
 
   const scoreColor = audit.score_pct >= 80 ? "#1D9E75" : audit.score_pct >= 50 ? "#EF9F27" : "#E24B4A";
 
@@ -133,9 +130,13 @@ export default function AuditReport({ auditId, onBack }) {
                 <i className="ti ti-alert-triangle" /> Action items ({actionItems.length})
               </div>
               <div style={{ background: "#FCEBEB", border: "0.5px solid #E24B4A", borderRadius: 10, padding: "0.75rem 1rem" }}>
-                {actionItems.map(({ section, item }, idx) => (
-                  <div key={item.id} style={{ fontSize: 13, padding: "5px 0", borderTop: idx === 0 ? "none" : "0.5px solid #f3d6d6" }}>
-                    <span style={{ color: "#888" }}>[{section}]</span> {item.label} — <span style={{ fontWeight: 600, color: "#A32D2D" }}>{answerLabel(item, optionsBySet, responseByItem)}</span>
+                {actionItems.map((entry, idx) => (
+                  <div key={entry.addressChange ? "address-change" : entry.item.id} style={{ fontSize: 13, padding: "5px 0", borderTop: idx === 0 ? "none" : "0.5px solid #f3d6d6" }}>
+                    {entry.addressChange ? (
+                      <><span style={{ color: "#888" }}>[{entry.section}]</span> Address was edited during the audit — <span style={{ fontWeight: 600, color: "#A32D2D" }}>check against the CRM source data</span></>
+                    ) : (
+                      <><span style={{ color: "#888" }}>[{entry.section}]</span> {entry.item.label} — <span style={{ fontWeight: 600, color: "#A32D2D" }}>{answerLabel(entry.item, optionsBySet, responseByItem)}</span></>
+                    )}
                   </div>
                 ))}
               </div>
