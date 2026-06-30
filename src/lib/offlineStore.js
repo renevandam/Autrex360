@@ -3,9 +3,10 @@
 // - auditSnapshots: the full template/sections/items/options needed to render an audit offline
 // - pendingResponses: answers given while offline, queued for sync
 // - pendingStockChecks: stock take rows given while offline, queued for sync
+// - pendingNotes: free-text notes added while offline, queued for sync
 
 const DB_NAME = "autrex360-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -22,6 +23,10 @@ function openDb() {
       if (!db.objectStoreNames.contains("pendingStockChecks")) {
         // key: `${auditId}:${itemId}:${rowOrder}`
         db.createObjectStore("pendingStockChecks", { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains("pendingNotes")) {
+        // key: `${auditId}:${itemId}` so re-saving the same note overwrites the queued one
+        db.createObjectStore("pendingNotes", { keyPath: "key" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -127,8 +132,39 @@ export async function clearPendingStockRow(key) {
   });
 }
 
+// ── Pending notes queue ──
+export async function queueNote(auditId, itemId, note) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx(db, "pendingNotes", "readwrite");
+    const req = store.put({ key: `${auditId}:${itemId}`, auditId, itemId, note, queuedAt: new Date().toISOString() });
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getPendingNotes(auditId) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx(db, "pendingNotes");
+    const req = store.getAll();
+    req.onsuccess = () => resolve((req.result || []).filter((r) => r.auditId === auditId));
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearPendingNote(key) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const store = tx(db, "pendingNotes", "readwrite");
+    const req = store.delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
 // ── Helpers ──
 export async function countPending(auditId) {
-  const [responses, stockRows] = await Promise.all([getPendingResponses(auditId), getPendingStockRows(auditId)]);
-  return responses.length + stockRows.length;
+  const [responses, stockRows, notes] = await Promise.all([getPendingResponses(auditId), getPendingStockRows(auditId), getPendingNotes(auditId)]);
+  return responses.length + stockRows.length + notes.length;
 }

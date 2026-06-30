@@ -17,7 +17,7 @@ function hexToRgb(hex, fallback) {
 }
 
 export async function exportAuditToPdf(auditId) {
-  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem, rangesBySet } = await loadAuditReportData(auditId);
+  const { audit, organization, sections, optionsBySet, responseByItem, noteByItem, stockByItem, photosByItem, rangesBySet } = await loadAuditReportData(auditId);
 
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -225,6 +225,17 @@ export async function exportAuditToPdf(auditId) {
         const wrappedAnswer = doc.splitTextToSize(answer, 150);
         doc.text(wrappedAnswer, pageWidth - margin - 150, y);
         y += Math.max(wrappedLabel.length, wrappedAnswer.length) * 13 + 4;
+      }
+
+      // Note attached to this question, if any
+      if (noteByItem[item.id]) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(...GREY);
+        const wrappedNote = doc.splitTextToSize(`Note: ${noteByItem[item.id]}`, pageWidth - margin * 2);
+        ensureSpace(wrappedNote.length * 12);
+        doc.text(wrappedNote, margin, y);
+        y += wrappedNote.length * 12 + 4;
       }
 
       // Embed photos for this question, thumbnail-sized, wrapping to new rows as needed

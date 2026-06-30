@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { exportAuditToPdf } from "./lib/exportPdf";
 import { exportAuditToPrintForm } from "./lib/exportPrintForm";
-import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, countPending } from "./lib/offlineStore";
+import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, queueNote, countPending } from "./lib/offlineStore";
 import { syncAuditToServer } from "./lib/offlineSync";
 import { uploadAuditPhoto, getPhotosForItem, deleteAuditPhoto } from "./lib/photoStorage";
 
@@ -96,12 +96,13 @@ function SignaturePad({ label }) {
 // ── Stock take table ──────────────────────────────────────
 // ── Info icon with click-to-show popover (not included in reports/PDF) ──
 // ── Photo upload: camera capture or file picker, with thumbnails + lightbox ──
-function PhotoUpload({ auditId, itemId, required, onCountChange }) {
+function PhotoUpload({ auditId, itemId, required, onCountChange, note, onNoteChange }) {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [noteOpen, setNoteOpen] = useState(false);
   const cameraInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -182,9 +183,34 @@ function PhotoUpload({ auditId, itemId, required, onCountChange }) {
         >
           <i className="ti ti-photo" /> File
         </button>
+        {(onNoteChange || note) && (
+          <button
+            onClick={() => setNoteOpen((v) => !v)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, borderRadius: 6, padding: "4px 8px", cursor: "pointer",
+              color: note ? "#378ADD" : "#888",
+              border: note ? "0.5px solid #378ADD" : "0.5px dashed #ccc",
+              background: note ? "#EAF3FC" : "none",
+            }}
+          >
+            <i className="ti ti-note" /> {note ? "Note" : "Add note"}
+          </button>
+        )}
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" multiple style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
       </div>
+
+      {(onNoteChange || note) && noteOpen && (
+        <textarea
+          autoFocus={!!onNoteChange}
+          readOnly={!onNoteChange}
+          value={note || ""}
+          onChange={(e) => onNoteChange?.(e.target.value)}
+          rows={2}
+          placeholder="Add a note for this question..."
+          style={{ width: "100%", marginTop: 6, border: "0.5px solid #ddd", borderRadius: 6, padding: "6px 9px", fontSize: 12, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", background: onNoteChange ? "white" : "#f5f5f5" }}
+        />
+      )}
 
       {lightboxUrl && (
         <div onClick={() => setLightboxUrl(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -456,6 +482,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const [itemOptions, setItemOptions] = useState({});
   const [sliderActionRanges, setSliderActionRanges] = useState({}); // setId -> [{range_start, range_end}]
   const [responses, setResponses] = useState({});
+  const [notes, setNotes] = useState({}); // itemId -> free-text note added alongside the answer
   const [photoCounts, setPhotoCounts] = useState({}); // itemId -> number of uploaded photos, used to enforce "photo required" questions
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("audit");
@@ -481,6 +508,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const navScrollRef = useRef(null);
   const saveTimers = useRef({});
   const loadedAuditIdRef = useRef(undefined); // tracks which auditId we've already successfully loaded, so reconnecting doesn't re-fetch and overwrite in-progress answers
+  const notesRef = useRef({}); // mirrors `notes` state synchronously, so snapshot refreshes always see the latest value
 
   // Track browser online/offline state so the UI can react immediately
   useEffect(() => {
@@ -519,6 +547,8 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
           setItemOptions(snapshot.itemOptions);
           setSnapshotStockRows(snapshot.stockRows || []);
           setResponses(snapshot.responses || {});
+          notesRef.current = snapshot.notes || {};
+          setNotes(notesRef.current);
           setAddrVerified(!!snapshot.addrVerified);
           setHasOfflineSnapshot(true);
           await refreshPendingCount();
@@ -591,13 +621,19 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       setSections(secs.map((s) => ({ ...s, items: grouped[s.id]||[] })));
       setItemOptions(itemOpts);
 
-      // Load any previously saved responses for this audit (resume a draft)
+      // Load any previously saved responses (and notes) for this audit (resume a draft)
       if (auditId) {
-        const { data: savedResponses } = await supabase.from("audit_responses").select("item_id, response").eq("audit_id", auditId);
+        const { data: savedResponses } = await supabase.from("audit_responses").select("item_id, response, note").eq("audit_id", auditId);
         if (savedResponses && savedResponses.length > 0) {
           const restored = {};
-          savedResponses.forEach((r) => { restored[r.item_id] = r.response; });
+          const restoredNotes = {};
+          savedResponses.forEach((r) => {
+            restored[r.item_id] = r.response;
+            if (r.note) restoredNotes[r.item_id] = r.note;
+          });
           setResponses(restored);
+          notesRef.current = restoredNotes;
+          setNotes(restoredNotes);
         }
         const auditRow = auditRowForSnapshot;
         if (auditRow) {
@@ -632,6 +668,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       sections,
       itemOptions,
       responses: currentResponses,
+      notes: notesRef.current,
       stockRows: stockRows || [],
       addrVerified,
     });
@@ -825,6 +862,30 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
         { onConflict: "audit_id,item_id" }
       );
       // Keep any existing offline snapshot fresh, so going offline later never loses this answer
+      clearTimeout(saveTimers.current.__snapshotRefresh);
+      saveTimers.current.__snapshotRefresh = setTimeout(() => {
+        setResponses((current) => { refreshSnapshotIfExists(current); return current; });
+      }, 800);
+    }, 500);
+  }
+
+  // Free-text note attached to a question, independent of its answer. Mirrors setResponse's
+  // save/queue/debounce pattern, but writes to its own "note" column so it never clobbers the answer.
+  function setNote(id, text) {
+    if (readOnly) return;
+    notesRef.current = { ...notesRef.current, [id]: text };
+    setNotes(notesRef.current);
+    if (!auditId) return;
+    if (isOffline) {
+      queueNote(auditId, id, text).then(refreshPendingCount);
+      return;
+    }
+    clearTimeout(saveTimers.current[`note:${id}`]);
+    saveTimers.current[`note:${id}`] = setTimeout(async () => {
+      await supabase.from("audit_responses").upsert(
+        { audit_id: auditId, item_id: id, note: text },
+        { onConflict: "audit_id,item_id" }
+      );
       clearTimeout(saveTimers.current.__snapshotRefresh);
       saveTimers.current.__snapshotRefresh = setTimeout(() => {
         setResponses((current) => { refreshSnapshotIfExists(current); return current; });
@@ -1148,6 +1209,8 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
                     itemId={item.id}
                     required={!!item.foto_verplicht}
                     onCountChange={(id, count) => setPhotoCounts((c) => (c[id] === count ? c : { ...c, [id]: count }))}
+                    note={notes[item.id]}
+                    onNoteChange={readOnly ? undefined : (text) => setNote(item.id, text)}
                   />
                 )}
               </div>

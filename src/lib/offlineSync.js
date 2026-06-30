@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { getPendingResponses, clearPendingResponse, getPendingStockRows, clearPendingStockRow } from "./offlineStore";
+import { getPendingResponses, clearPendingResponse, getPendingStockRows, clearPendingStockRow, getPendingNotes, clearPendingNote } from "./offlineStore";
 
 // Pushes everything queued locally for this audit to Supabase.
 // Returns { synced, failed } counts so the UI can report back to the auditor.
@@ -17,6 +17,20 @@ export async function syncAuditToServer(auditId) {
       failed++;
     } else {
       await clearPendingResponse(r.key);
+      synced++;
+    }
+  }
+
+  const pendingNotes = await getPendingNotes(auditId);
+  for (const n of pendingNotes) {
+    const { error } = await supabase.from("audit_responses").upsert(
+      { audit_id: n.auditId, item_id: n.itemId, note: n.note },
+      { onConflict: "audit_id,item_id" }
+    );
+    if (error) {
+      failed++;
+    } else {
+      await clearPendingNote(n.key);
       synced++;
     }
   }

@@ -74,7 +74,11 @@ export async function loadAuditReportData(auditId) {
   ]);
 
   const responseByItem = {};
-  (responses || []).forEach((r) => { responseByItem[r.item_id] = r.response; });
+  const noteByItem = {};
+  (responses || []).forEach((r) => {
+    responseByItem[r.item_id] = r.response;
+    if (r.note) noteByItem[r.item_id] = r.note;
+  });
   const stockByItem = {};
   (stockRows || []).forEach((r) => { stockByItem[r.item_id] = stockByItem[r.item_id] || []; stockByItem[r.item_id].push(r); });
   const photosByItem = {};
@@ -89,6 +93,7 @@ export async function loadAuditReportData(auditId) {
     sections: sectionsResult,
     optionsBySet,
     responseByItem,
+    noteByItem,
     stockByItem,
     photosByItem,
     rangesBySet,

@@ -57,7 +57,7 @@ export default function AuditReport({ auditId, onBack }) {
     </div>
   );
 
-  const { audit, organization, sections, optionsBySet, responseByItem, stockByItem, photosByItem, rangesBySet } = data;
+  const { audit, organization, sections, optionsBySet, responseByItem, noteByItem, stockByItem, photosByItem, rangesBySet } = data;
 
   const actionItems = getActionItems(sections, optionsBySet, responseByItem, rangesBySet, audit);
 
@@ -192,6 +192,12 @@ export default function AuditReport({ auditId, onBack }) {
                       <div style={{ fontSize: 13, fontWeight: 600, color: flagged ? "#A32D2D" : (color || "#1D9E75"), whiteSpace: "nowrap" }}>
                         {answerLabel(item, optionsBySet, responseByItem)}
                       </div>
+                    </div>
+                  )}
+                  {noteByItem[item.id] && (
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#555", background: "#F3F3F3", borderRadius: 6, padding: "6px 9px", display: "flex", gap: 6, alignItems: "flex-start" }}>
+                      <i className="ti ti-note" style={{ fontSize: 12, color: "#888", marginTop: 1 }} />
+                      <span>{noteByItem[item.id]}</span>
                     </div>
                   )}
                   {(photosByItem[item.id] || []).length > 0 && (
