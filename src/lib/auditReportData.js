@@ -110,7 +110,7 @@ export function answerLabel(item, optionsBySet, responseByItem) {
     const match = opts.find((o) => o.id === raw);
     return match ? match.label : raw;
   }
-  if (item.answer_type === "checkbox") return raw === "true" ? "Yes" : "No";
+  if (item.answer_type === "checkbox") return raw === "na" ? "N/A" : raw === "true" ? "Yes" : "No";
   if (item.answer_type === "slider") return `${raw}%`;
   if (item.answer_type === "datetime") {
     const mode = item.datetime_mode || "date";
