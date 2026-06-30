@@ -689,14 +689,19 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
 
   // Auto-collapse a section the first time it becomes fully answered.
   // Tracked via autoCollapsedOnce so manually re-opening it (e.g. to fix an answer) doesn't get immediately re-collapsed.
+  // Debounced: a slider fires onChange continuously while being dragged, so without this delay a section
+  // with just one slider question would collapse the instant you touch it instead of when you let go.
   useEffect(() => {
-    sections.forEach((sec) => {
-      const prog = sectionProgress(sec);
-      if (prog.total > 0 && prog.complete && !autoCollapsedOnce.current[sec.id]) {
-        autoCollapsedOnce.current[sec.id] = true;
-        setCollapsedSections((prev) => ({ ...prev, [sec.id]: true }));
-      }
-    });
+    const timer = setTimeout(() => {
+      sections.forEach((sec) => {
+        const prog = sectionProgress(sec);
+        if (prog.total > 0 && prog.complete && !autoCollapsedOnce.current[sec.id]) {
+          autoCollapsedOnce.current[sec.id] = true;
+          setCollapsedSections((prev) => ({ ...prev, [sec.id]: true }));
+        }
+      });
+    }, 600);
+    return () => clearTimeout(timer);
   }, [responses, sections]);
 
   // Track which section is currently in view, to highlight it in the sticky nav
