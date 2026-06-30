@@ -471,6 +471,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const sectionRefs = useRef({});
   const navScrollRef = useRef(null);
   const saveTimers = useRef({});
+  const loadedAuditIdRef = useRef(undefined); // tracks which auditId we've already successfully loaded, so reconnecting doesn't re-fetch and overwrite in-progress answers
 
   // Track browser online/offline state so the UI can react immediately
   useEffect(() => {
@@ -490,6 +491,15 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
 
   useEffect(() => {
     async function load() {
+      // Once this audit has been loaded successfully once, don't let a later connectivity change
+      // (e.g. reconnecting after editing offline) silently re-fetch from the server and overwrite
+      // answers that are still sitting in the local sync queue. Just keep the pending-count badge
+      // fresh so the "Sync now" button shows up - the actual push happens via handleSync.
+      if (auditId && loadedAuditIdRef.current === auditId) {
+        await refreshPendingCount();
+        return;
+      }
+
       // If we have no network at all, go straight to whatever was downloaded earlier
       if (isOffline && auditId) {
         const snapshot = await getAuditSnapshot(auditId);
@@ -503,10 +513,12 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
           setAddrVerified(!!snapshot.addrVerified);
           setHasOfflineSnapshot(true);
           await refreshPendingCount();
+          loadedAuditIdRef.current = auditId;
           setLoading(false);
           return;
         }
-        // No snapshot available and no network - nothing we can do
+        // No snapshot available and no network - nothing we can do yet; keep retrying
+        // (loadedAuditIdRef stays unset) until connectivity returns.
         setLoading(false);
         return;
       }
@@ -591,6 +603,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
         setHasOfflineSnapshot(!!existingSnapshot);
         await refreshPendingCount();
       }
+      loadedAuditIdRef.current = auditId;
       setLoading(false);
     }
     load();
