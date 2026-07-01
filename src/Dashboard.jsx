@@ -705,7 +705,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     await load();
   }
 
-  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5", datetime_mode: "date", foto_verplicht: false, checkbox_na_enabled: false };
+  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5", datetime_mode: "date", foto_verplicht: false };
 
   // Photo upload only applies to question types that actually render the PhotoUpload control in AuditRun
   function supportsPhoto(answerType) {
@@ -713,10 +713,11 @@ function TemplateDetail({ template, canManage, onBack }) {
   }
 
   // Weight only affects the score for types AuditRun actually includes in its scoring: score
-  // questions (buttons/slider answer set) and checkbox. Everything else (text, number, datetime,
-  // the standalone slider, signature, stock_take) is ignored by the score calculation entirely.
+  // questions (buttons/slider answer set). Checkbox is a plain todo/acknowledgment with no score,
+  // and everything else (text, number, datetime, the standalone slider, signature, stock_take) is
+  // ignored by the score calculation too.
   function countsTowardScore(answerType) {
-    return !answerType || answerType === "score" || answerType === "checkbox";
+    return !answerType || answerType === "score";
   }
 
   function toggleItemForm(sectionId) {
@@ -750,7 +751,6 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_max_rows: form.stock_max_rows ? parseInt(form.stock_max_rows) : 5,
       datetime_mode: form.datetime_mode || "date",
       foto_verplicht: supportsPhoto(form.answer_type) ? !!form.foto_verplicht : false,
-      checkbox_na_enabled: form.answer_type === "checkbox" ? !!form.checkbox_na_enabled : false,
       sort_order: (items[sectionId] || []).length,
     }]);
     setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, open: false } }));
@@ -787,7 +787,6 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_max_rows: item.stock_max_rows !== null && item.stock_max_rows !== undefined ? String(item.stock_max_rows) : "5",
       datetime_mode: item.datetime_mode || "date",
       foto_verplicht: !!item.foto_verplicht,
-      checkbox_na_enabled: !!item.checkbox_na_enabled,
       _sectionId: item.section_id,
     });
   }
@@ -809,7 +808,6 @@ function TemplateDetail({ template, canManage, onBack }) {
       stock_max_rows: editForm.stock_max_rows ? parseInt(editForm.stock_max_rows) : 5,
       datetime_mode: editForm.datetime_mode || "date",
       foto_verplicht: supportsPhoto(editForm.answer_type) ? !!editForm.foto_verplicht : false,
-      checkbox_na_enabled: editForm.answer_type === "checkbox" ? !!editForm.checkbox_na_enabled : false,
     }).eq("id", editingItemId);
     setEditingItemId(null); setEditForm({});
     await load();
@@ -891,12 +889,6 @@ function TemplateDetail({ template, canManage, onBack }) {
                             {DATETIME_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                           </select>
                         </>
-                      )}
-                      {editForm.answer_type === "checkbox" && (
-                        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                          <input type="checkbox" checked={!!editForm.checkbox_na_enabled} onChange={(e) => setEditForm((f) => ({ ...f, checkbox_na_enabled: e.target.checked }))} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
-                          <span style={{ fontSize: 12, color: "#555" }}>Allow marking this checkbox as N/A during the audit</span>
-                        </div>
                       )}
                       {countsTowardScore(editForm.answer_type) && (
                         <>
@@ -1011,12 +1003,6 @@ function TemplateDetail({ template, canManage, onBack }) {
                         {DATETIME_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                       </select>
                     </>
-                  )}
-                  {newItemForms[section.id]?.answer_type === "checkbox" && (
-                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                      <input type="checkbox" checked={!!newItemForms[section.id]?.checkbox_na_enabled} onChange={(e) => updateItemForm(section.id, "checkbox_na_enabled", e.target.checked)} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
-                      <span style={{ fontSize: 12, color: "#555" }}>Allow marking this checkbox as N/A during the audit</span>
-                    </div>
                   )}
                   {countsTowardScore(newItemForms[section.id]?.answer_type) && (
                     <>

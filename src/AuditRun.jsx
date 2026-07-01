@@ -424,25 +424,13 @@ function AnswerInput({ item, options, value, onChange }) {
   }
 
   if (type === "checkbox") {
-    // Whether this checkbox may be marked N/A at all is a template setting (set in Dashboard), not
-    // something the auditor toggles per audit - so the N/A control only shows up when enabled there.
-    const naEnabled = !!item.checkbox_na_enabled;
-    const isNa = naEnabled && value === "na";
+    // Plain todo/acknowledgment checkbox - no score, no N/A concept. (checked comparison handles
+    // both a live boolean and a "true"/"false" string once reloaded from the database.)
     return (
-      <div style={{ marginTop: 8 }}>
-        {!isNa && (
-          <label style={{ display:"flex",alignItems:"center",gap:8,cursor:"pointer" }}>
-            <input type="checkbox" checked={value === true || value === "true"} onChange={(e) => onChange(e.target.checked)} style={{ width:16,height:16,accentColor:"#1D9E75" }} />
-            <span style={{ fontSize:13,color:"#555" }}>Agree</span>
-          </label>
-        )}
-        {naEnabled && (
-          <label style={{ display:"flex",alignItems:"center",gap:6,marginTop:isNa?0:8,cursor:"pointer" }}>
-            <input type="checkbox" checked={isNa} onChange={(e) => onChange(e.target.checked ? "na" : false)} style={{ width:14,height:14,accentColor:"#378ADD" }} />
-            <span style={{ fontSize:12,color:"#888" }}>Doesn't apply (N/A)</span>
-          </label>
-        )}
-      </div>
+      <label style={{ display:"flex",alignItems:"center",gap:8,marginTop:8,cursor:"pointer" }}>
+        <input type="checkbox" checked={value === true || value === "true"} onChange={(e) => onChange(e.target.checked)} style={{ width:16,height:16,accentColor:"#1D9E75" }} />
+        <span style={{ fontSize:13,color:"#555" }}>Agree</span>
+      </label>
     );
   }
 
@@ -833,35 +821,26 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   // Score
   const itemWeight = (i) => i.weight ? Number(i.weight) : 1;
   const isSliderItem = (i) => i.answer_sets?.set_type === "slider";
-  // Checkbox questions count toward the score too (checked = full weight, unchecked = none),
-  // alongside the existing score-type questions (buttons or slider answer sets).
-  const isScorableItem = (i) => i.answer_type === "checkbox" || ((i.answer_type === "score" || !i.answer_type) && (isSliderItem(i) || (itemOptions[i.id]||[]).length > 0));
+  // Checkbox questions are a plain todo/acknowledgment - they don't carry a score. Only score-type
+  // questions (buttons or slider answer sets) count toward the audit's percentage.
+  const isScorableItem = (i) => (i.answer_type === "score" || !i.answer_type) && (isSliderItem(i) || (itemOptions[i.id]||[]).length > 0);
   const scoreItems = allItems.filter(isScorableItem);
 
   // For a slider item, "is this response N/A" means the response equals the N/A option's id.
   // For a button item, it means the selected option itself has is_na set.
-  // For a checkbox item, it means the dedicated N/A checkbox was ticked (stored as the literal "na" response).
   function isNaResponse(i) {
-    if (i.answer_type === "checkbox") return responses[i.id] === "na";
     const opt = (itemOptions[i.id]||[]).find((o) => o.id === responses[i.id]);
     return !!opt?.is_na;
   }
 
-  // Slider max score is simply its configured max (or 100 for percentage); button max is the highest scoring option;
-  // checkbox max is just 1 (a binary checked/unchecked, scaled like any other item by its weight).
+  // Slider max score is simply its configured max (or 100 for percentage); button max is the highest scoring option.
   const itemMaxScore = (i) => {
-    if (i.answer_type === "checkbox") return 1;
     if (isSliderItem(i)) return Number(i.answer_sets.slider_max ?? 100);
     return Math.max(0, ...((itemOptions[i.id]||[]).filter((o) => !o.is_na && o.score !== null).map((o) => o.score)));
   };
 
-  // Slider achieved score is the numeric response value itself; button achieved score is the selected option's score;
-  // checkbox achieved score is 1 when checked, 0 when unchecked (responses may be a boolean live or a "true"/"false" string once reloaded from the database).
+  // Slider achieved score is the numeric response value itself; button achieved score is the selected option's score.
   function achievedScore(i) {
-    if (i.answer_type === "checkbox") {
-      if (isNaResponse(i)) return 0;
-      return (responses[i.id] === true || responses[i.id] === "true") ? 1 : 0;
-    }
     if (isSliderItem(i)) {
       const raw = responses[i.id];
       if (raw === undefined || raw === null || raw === "" || isNaResponse(i)) return 0;
