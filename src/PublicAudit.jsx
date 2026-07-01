@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
+import { getTableColumns, getTableMaxRows, emptyTableRow, MAX_TABLE_COLUMNS } from "./lib/tableColumns";
 
 // Current date/time formatted for the matching HTML input type
 function nowForMode(mode) {
@@ -152,13 +153,14 @@ function PublicStockTake({ item, auditId }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const saveTimers = useRef({});
-  const maxRows = item.stock_max_rows || 5;
+  const columns = getTableColumns(item);
+  const maxRows = getTableMaxRows(item);
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase.from("stock_checks").select("*").eq("audit_id", auditId).eq("item_id", item.id).order("row_order");
       let loaded = (data || []).sort((a, b) => a.row_order - b.row_order);
-      while (loaded.length < maxRows) loaded = [...loaded, { id: null, row_order: loaded.length, col1_value: "", col2_value: "", col3_value: "" }];
+      while (loaded.length < maxRows) loaded = [...loaded, emptyTableRow(loaded.length, columns.length)];
       setRows(loaded.slice(0, maxRows));
       setLoading(false);
     }
@@ -171,7 +173,11 @@ function PublicStockTake({ item, auditId }) {
     saveTimers.current[rowIdx] = setTimeout(async () => {
       setRows((currentRows) => {
         const row = currentRows[rowIdx];
-        const payload = { audit_id: auditId, item_id: item.id, row_order: rowIdx, col1_value: row.col1_value || null, col2_value: row.col2_value || null, col3_value: row.col3_value || null };
+        const payload = { audit_id: auditId, item_id: item.id, row_order: rowIdx };
+        for (let i = 0; i < MAX_TABLE_COLUMNS; i++) {
+          const key = `col${i + 1}_value`;
+          payload[key] = i < columns.length ? (row[key] || null) : null;
+        }
         supabase.from("stock_checks").upsert({ ...payload, [field]: value }, { onConflict: "audit_id,item_id,row_order" });
         return currentRows;
       });
@@ -180,22 +186,28 @@ function PublicStockTake({ item, auditId }) {
 
   if (loading) return <div style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>Loading...</div>;
 
-  const col1 = item.stock_col1_label || "Column 1";
-  const col2 = item.stock_col2_label || "Column 2";
-  const col3 = item.stock_col3_label || "Quantity";
-
   return (
     <div style={{ marginTop: 8, overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
-          <tr>{[col1, col2, col3].map((h) => <th key={h} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>{h}</th>)}</tr>
+          <tr>{columns.map((col, i) => <th key={i} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>{col.label}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, idx) => (
             <tr key={idx}>
-              <td style={{ padding: "3px 4px" }}><input value={row.col1_value || ""} onChange={(e) => updateCell(idx, "col1_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12 }} /></td>
-              <td style={{ padding: "3px 4px" }}><input value={row.col2_value || ""} onChange={(e) => updateCell(idx, "col2_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12 }} /></td>
-              <td style={{ padding: "3px 4px", width: 90 }}><input type="number" value={row.col3_value || ""} onChange={(e) => updateCell(idx, "col3_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, textAlign: "center" }} /></td>
+              {columns.map((col, ci) => {
+                const field = `col${ci + 1}_value`;
+                return (
+                  <td key={ci} style={{ padding: "3px 4px", ...(col.type === "number" ? { width: 90 } : {}) }}>
+                    <input
+                      type={col.type === "number" ? "number" : "text"}
+                      value={row[field] || ""}
+                      onChange={(e) => updateCell(idx, field, e.target.value)}
+                      style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, ...(col.type === "number" ? { textAlign: "center" } : {}) }}
+                    />
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

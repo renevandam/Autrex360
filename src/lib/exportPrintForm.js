@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
+import { getTableColumns, getTableMaxRows } from "./tableColumns";
 
 const BRAND_BLUE = [11, 110, 193];
 const BRAND_DARK = [9, 50, 90];
@@ -211,27 +212,26 @@ export async function exportAuditToPrintForm(auditId, offlineSnapshot = null) {
         doc.text("_______________________", margin + 10, y);
         y += 20;
       } else if (item.answer_type === "stock_take") {
-        const col1 = item.stock_col1_label || "Item";
-        const col2 = item.stock_col2_label || "Location";
-        const col3 = item.stock_col3_label || "Quantity";
-        const maxRows = item.stock_max_rows || 5;
-        const colWidths = [(pageWidth - margin * 2 - 20) * 0.4, (pageWidth - margin * 2 - 20) * 0.35, (pageWidth - margin * 2 - 20) * 0.25];
+        const tableColumns = getTableColumns(item);
+        const maxRows = getTableMaxRows(item);
+        const totalWidth = pageWidth - margin * 2 - 20;
+        const colWidths = tableColumns.map(() => totalWidth / tableColumns.length);
         const rowHeight = 18;
         ensureSpace(rowHeight * (maxRows + 1) + 6);
         let xPos = margin + 10;
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(...GREY);
-        [col1, col2, col3].forEach((h, i) => { doc.text(h, xPos + 3, y - 4); xPos += colWidths[i]; });
+        tableColumns.forEach((col, i) => { doc.text(col.label, xPos + 3, y - 4); xPos += colWidths[i]; });
         y += 4;
         doc.setDrawColor(...LIGHT_GREY);
         for (let r = 0; r <= maxRows; r++) {
           doc.line(margin + 10, y + r * rowHeight, margin + 10 + colWidths.reduce((a, b) => a + b, 0), y + r * rowHeight);
         }
         xPos = margin + 10;
-        for (let c = 0; c <= 3; c++) {
+        for (let c = 0; c <= tableColumns.length; c++) {
           doc.line(xPos, y, xPos, y + maxRows * rowHeight);
-          if (c < 3) xPos += colWidths[c];
+          if (c < tableColumns.length) xPos += colWidths[c];
         }
         y += maxRows * rowHeight + 10;
       } else {

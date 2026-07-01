@@ -45,6 +45,8 @@ export async function syncAuditToServer(auditId) {
         col1_value: row.col1_value || null,
         col2_value: row.col2_value || null,
         col3_value: row.col3_value || null,
+        col4_value: row.col4_value || null,
+        col5_value: row.col5_value || null,
       },
       { onConflict: "audit_id,item_id,row_order" }
     );

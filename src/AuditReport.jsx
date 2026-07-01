@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { loadAuditReportData, answerLabel, isActionItem, answerColor, getActionItems, STATUS_LABEL } from "./lib/auditReportData";
 import { exportAuditToPdf } from "./lib/exportPdf";
+import { getTableColumns } from "./lib/tableColumns";
 
 export default function AuditReport({ auditId, onBack }) {
   const [data, setData] = useState(null);
@@ -166,17 +167,17 @@ export default function AuditReport({ auditId, onBack }) {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                           <thead>
                             <tr>
-                              {[item.stock_col1_label || "Col1", item.stock_col2_label || "Col2", item.stock_col3_label || "Col3"].map((h) => (
-                                <th key={h} style={{ textAlign: "left", color: "#aaa", fontWeight: 500, padding: "3px 6px", borderBottom: "0.5px solid #ddd" }}>{h}</th>
+                              {getTableColumns(item).map((col, ci) => (
+                                <th key={ci} style={{ textAlign: "left", color: "#aaa", fontWeight: 500, padding: "3px 6px", borderBottom: "0.5px solid #ddd" }}>{col.label}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {(stockByItem[item.id] || []).map((row) => (
                               <tr key={row.id || row.row_order}>
-                                <td style={{ padding: "3px 6px" }}>{row.col1_value || "—"}</td>
-                                <td style={{ padding: "3px 6px" }}>{row.col2_value || "—"}</td>
-                                <td style={{ padding: "3px 6px" }}>{row.col3_value || "—"}</td>
+                                {getTableColumns(item).map((col, ci) => (
+                                  <td key={ci} style={{ padding: "3px 6px" }}>{row[`col${ci + 1}_value`] || "—"}</td>
+                                ))}
                               </tr>
                             ))}
                           </tbody>

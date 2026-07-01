@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { exportAuditToPdf } from "./lib/exportPdf";
 import { exportAuditToPrintForm } from "./lib/exportPrintForm";
+import { getTableColumns, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS } from "./lib/tableColumns";
 
 const NAV = [
   { id: "home",       label: "Dashboard",   icon: "ti-home" },
@@ -20,7 +21,7 @@ const ANSWER_TYPES = [
   { value: "text",       label: "Text" },
   { value: "slider",     label: "Slider (0-100%)" },
   { value: "signature",  label: "Signature" },
-  { value: "stock_take", label: "Stock take (table)" },
+  { value: "stock_take", label: "Table" },
   { value: "datetime",   label: "Date/Time" },
 ];
 
@@ -52,6 +53,46 @@ const s = {
   empty:   { textAlign: "center", padding: "2rem", color: "#aaa", fontSize: 13 },
   backBtn: { fontSize: 13, color: "#1D9E75", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 12 },
 };
+
+// ── Table question column editor (used by both the "new question" and "edit question" forms) ──
+function TableColumnsEditor({ columns, maxRows, onColumnsChange, onMaxRowsChange }) {
+  const cols = columns && columns.length > 0 ? columns : [{ label: "", type: "text" }];
+
+  function updateCol(idx, field, value) {
+    onColumnsChange(cols.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
+  }
+  function addCol() {
+    if (cols.length >= MAX_TABLE_COLUMNS) return;
+    onColumnsChange([...cols, { label: "", type: "text" }]);
+  }
+  function removeCol(idx) {
+    if (cols.length <= 1) return;
+    onColumnsChange(cols.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <>
+      <div style={{ ...s.label, marginTop: 8 }}>Columns (max {MAX_TABLE_COLUMNS})</div>
+      {cols.map((col, idx) => (
+        <div key={idx} style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
+          <input value={col.label} onChange={(e) => updateCol(idx, "label", e.target.value)} style={{ ...s.input, marginTop: 0, flex: 1 }} placeholder={`Column ${idx + 1} name`} />
+          <select value={col.type || "text"} onChange={(e) => updateCol(idx, "type", e.target.value)} style={{ ...s.select, marginTop: 0, width: 100 }}>
+            <option value="text">Text</option>
+            <option value="number">Number</option>
+          </select>
+          {cols.length > 1 && (
+            <button onClick={() => removeCol(idx)} style={{ fontSize: 13, color: "#ccc", border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}><i className="ti ti-x" /></button>
+          )}
+        </div>
+      ))}
+      {cols.length < MAX_TABLE_COLUMNS && (
+        <button onClick={addCol} style={{ ...s.btnSm, marginTop: 8 }}><i className="ti ti-plus" /> Add column</button>
+      )}
+      <div style={{ ...s.label, marginTop: 10 }}>Max. number of rows (max {MAX_TABLE_ROWS})</div>
+      <input type="number" min="1" max={MAX_TABLE_ROWS} value={maxRows} onChange={(e) => onMaxRowsChange(e.target.value)} style={s.input} />
+    </>
+  );
+}
 
 // ── Home ─────────────────────────────────────────────────
 function Home({ onNav, locCount, tplCount, auditCount, onNewAudit }) {
@@ -705,7 +746,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     await load();
   }
 
-  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", stock_col1_label: "Artikelnummer", stock_col2_label: "Binlocatie", stock_col3_label: "Aantal", stock_max_rows: "5", datetime_mode: "date", foto_verplicht: false };
+  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", table_columns: [{ label: "Item number", type: "text" }, { label: "Bin location", type: "text" }, { label: "Quantity", type: "number" }], stock_max_rows: "5", datetime_mode: "date", foto_verplicht: false };
 
   // Photo upload only applies to question types that actually render the PhotoUpload control in AuditRun
   function supportsPhoto(answerType) {
@@ -745,10 +786,8 @@ function TemplateDetail({ template, canManage, onBack }) {
       weight: form.weight ? parseFloat(form.weight) : 1,
       depends_on_item_id: form.depends_on_item_id || null,
       depends_on_value: form.depends_on_item_id && form.depends_on_value ? form.depends_on_value : null,
-      stock_col1_label: form.stock_col1_label || "Artikelnummer",
-      stock_col2_label: form.stock_col2_label || "Binlocatie",
-      stock_col3_label: form.stock_col3_label || "Aantal",
-      stock_max_rows: form.stock_max_rows ? parseInt(form.stock_max_rows) : 5,
+      table_columns: form.answer_type === "stock_take" ? (form.table_columns || defaultItemForm.table_columns) : null,
+      stock_max_rows: form.stock_max_rows ? Math.min(MAX_TABLE_ROWS, Math.max(1, parseInt(form.stock_max_rows))) : 5,
       datetime_mode: form.datetime_mode || "date",
       foto_verplicht: supportsPhoto(form.answer_type) ? !!form.foto_verplicht : false,
       sort_order: (items[sectionId] || []).length,
@@ -781,9 +820,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       label: item.label, sub_label: item.sub_label || "", info_text: item.info_text || "", answer_type: item.answer_type || "score", answer_set_id: item.answer_set_id || "",
       weight: item.weight !== null && item.weight !== undefined ? String(item.weight) : "1",
       depends_on_item_id: item.depends_on_item_id || "", depends_on_value: item.depends_on_value || "",
-      stock_col1_label: item.stock_col1_label || "Artikelnummer",
-      stock_col2_label: item.stock_col2_label || "Binlocatie",
-      stock_col3_label: item.stock_col3_label || "Aantal",
+      table_columns: getTableColumns(item),
       stock_max_rows: item.stock_max_rows !== null && item.stock_max_rows !== undefined ? String(item.stock_max_rows) : "5",
       datetime_mode: item.datetime_mode || "date",
       foto_verplicht: !!item.foto_verplicht,
@@ -802,10 +839,8 @@ function TemplateDetail({ template, canManage, onBack }) {
       weight: editForm.weight ? parseFloat(editForm.weight) : 1,
       depends_on_item_id: editForm.depends_on_item_id || null,
       depends_on_value: editForm.depends_on_item_id && editForm.depends_on_value ? editForm.depends_on_value : null,
-      stock_col1_label: editForm.stock_col1_label || "Artikelnummer",
-      stock_col2_label: editForm.stock_col2_label || "Binlocatie",
-      stock_col3_label: editForm.stock_col3_label || "Aantal",
-      stock_max_rows: editForm.stock_max_rows ? parseInt(editForm.stock_max_rows) : 5,
+      table_columns: editForm.answer_type === "stock_take" ? (editForm.table_columns || null) : null,
+      stock_max_rows: editForm.stock_max_rows ? Math.min(MAX_TABLE_ROWS, Math.max(1, parseInt(editForm.stock_max_rows))) : 5,
       datetime_mode: editForm.datetime_mode || "date",
       foto_verplicht: supportsPhoto(editForm.answer_type) ? !!editForm.foto_verplicht : false,
     }).eq("id", editingItemId);
@@ -871,16 +906,12 @@ function TemplateDetail({ template, canManage, onBack }) {
                         </>
                       )}
                       {editForm.answer_type === "stock_take" && (
-                        <>
-                          <div style={{ ...s.label, marginTop: 8 }}>Column 1 (text)</div>
-                          <input value={editForm.stock_col1_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col1_label: e.target.value }))} style={s.input} placeholder="e.g. Item number" />
-                          <div style={{ ...s.label, marginTop: 8 }}>Column 2 (text)</div>
-                          <input value={editForm.stock_col2_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col2_label: e.target.value }))} style={s.input} placeholder="e.g. Bin location" />
-                          <div style={{ ...s.label, marginTop: 8 }}>Column 3 (quantity)</div>
-                          <input value={editForm.stock_col3_label} onChange={(e) => setEditForm((f) => ({ ...f, stock_col3_label: e.target.value }))} style={s.input} placeholder="e.g. Quantity" />
-                          <div style={{ ...s.label, marginTop: 8 }}>Max. number of rows</div>
-                          <input type="number" min="1" max="20" value={editForm.stock_max_rows} onChange={(e) => setEditForm((f) => ({ ...f, stock_max_rows: e.target.value }))} style={s.input} />
-                        </>
+                        <TableColumnsEditor
+                          columns={editForm.table_columns}
+                          maxRows={editForm.stock_max_rows}
+                          onColumnsChange={(cols) => setEditForm((f) => ({ ...f, table_columns: cols }))}
+                          onMaxRowsChange={(v) => setEditForm((f) => ({ ...f, stock_max_rows: v }))}
+                        />
                       )}
                       {editForm.answer_type === "datetime" && (
                         <>
@@ -985,16 +1016,12 @@ function TemplateDetail({ template, canManage, onBack }) {
                     </>
                   )}
                   {newItemForms[section.id]?.answer_type === "stock_take" && (
-                    <>
-                      <div style={{ ...s.label, marginTop: 8 }}>Column 1 (text)</div>
-                      <input value={newItemForms[section.id]?.stock_col1_label ?? "Artikelnummer"} onChange={(e) => updateItemForm(section.id, "stock_col1_label", e.target.value)} style={s.input} placeholder="e.g. Item number" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Column 2 (text)</div>
-                      <input value={newItemForms[section.id]?.stock_col2_label ?? "Binlocatie"} onChange={(e) => updateItemForm(section.id, "stock_col2_label", e.target.value)} style={s.input} placeholder="e.g. Bin location" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Column 3 (quantity)</div>
-                      <input value={newItemForms[section.id]?.stock_col3_label ?? "Aantal"} onChange={(e) => updateItemForm(section.id, "stock_col3_label", e.target.value)} style={s.input} placeholder="e.g. Quantity" />
-                      <div style={{ ...s.label, marginTop: 8 }}>Max. number of rows</div>
-                      <input type="number" min="1" max="20" value={newItemForms[section.id]?.stock_max_rows ?? "5"} onChange={(e) => updateItemForm(section.id, "stock_max_rows", e.target.value)} style={s.input} />
-                    </>
+                    <TableColumnsEditor
+                      columns={newItemForms[section.id]?.table_columns ?? defaultItemForm.table_columns}
+                      maxRows={newItemForms[section.id]?.stock_max_rows ?? "5"}
+                      onColumnsChange={(cols) => updateItemForm(section.id, "table_columns", cols)}
+                      onMaxRowsChange={(v) => updateItemForm(section.id, "stock_max_rows", v)}
+                    />
                   )}
                   {newItemForms[section.id]?.answer_type === "datetime" && (
                     <>

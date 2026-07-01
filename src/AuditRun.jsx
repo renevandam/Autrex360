@@ -5,6 +5,7 @@ import { exportAuditToPrintForm } from "./lib/exportPrintForm";
 import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, queueNote, countPending } from "./lib/offlineStore";
 import { syncAuditToServer } from "./lib/offlineSync";
 import { uploadAuditPhoto, getPhotosForItem, deleteAuditPhoto } from "./lib/photoStorage";
+import { getTableColumns, getTableMaxRows, emptyTableRow, MAX_TABLE_COLUMNS } from "./lib/tableColumns";
 
 function pctColor(pct) {
   if (pct < 20) return "#A32D2D";
@@ -261,10 +262,8 @@ function InfoIcon({ text }) {
 function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOnline }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const maxRows = item.stock_max_rows || 5;
-  const col1 = item.stock_col1_label || "Item number";
-  const col2 = item.stock_col2_label || "Bin location";
-  const col3 = item.stock_col3_label || "Quantity";
+  const columns = getTableColumns(item); // 1-5 {label, type} entries, falls back to legacy col1/2/3 for older items
+  const maxRows = getTableMaxRows(item);
   const saveTimers = useRef({});
   const pendingValues = useRef({}); // rowIdx -> latest {field: value} not yet flushed
 
@@ -282,7 +281,7 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
       let loaded = (data || []).sort((a, b) => a.row_order - b.row_order);
       // Pad with empty rows up to maxRows so there's always something to fill in
       while (loaded.length < maxRows) {
-        loaded = [...loaded, { id: null, row_order: loaded.length, col1_value: "", col2_value: "", col3_value: "" }];
+        loaded = [...loaded, emptyTableRow(loaded.length, columns.length)];
       }
       setRows(loaded.slice(0, maxRows));
       setLoading(false);
@@ -301,11 +300,11 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
       // Read current row state at flush time (not at keystroke time) to merge with whatever else changed
       setRows((currentRows) => {
         const row = { ...currentRows[rowIdx], ...pending };
-        const values = {
-          col1_value: row.col1_value || null,
-          col2_value: row.col2_value || null,
-          col3_value: row.col3_value || null,
-        };
+        const values = {};
+        for (let i = 0; i < MAX_TABLE_COLUMNS; i++) {
+          const key = `col${i + 1}_value`;
+          values[key] = i < columns.length ? (row[key] || null) : null;
+        }
         if (isOffline) {
           // No network at all - write to the local queue, synced later by the auditor
           queueStockRow(auditId, item.id, rowIdx, values);
@@ -332,23 +331,27 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
-            {[col1, col2, col3].map((h) => (
-              <th key={h} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>{h}</th>
+            {columns.map((col, i) => (
+              <th key={i} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>{col.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, idx) => (
             <tr key={idx}>
-              <td style={{ padding: "4px 4px" }}>
-                <input value={row.col1_value || ""} onChange={(e) => updateCell(idx, "col1_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white" }} />
-              </td>
-              <td style={{ padding: "4px 4px" }}>
-                <input value={row.col2_value || ""} onChange={(e) => updateCell(idx, "col2_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white" }} />
-              </td>
-              <td style={{ padding: "4px 4px", width: 90 }}>
-                <input type="number" value={row.col3_value || ""} onChange={(e) => updateCell(idx, "col3_value", e.target.value)} style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white", textAlign: "center" }} />
-              </td>
+              {columns.map((col, ci) => {
+                const field = `col${ci + 1}_value`;
+                return (
+                  <td key={ci} style={{ padding: "4px 4px", ...(col.type === "number" ? { width: 90 } : {}) }}>
+                    <input
+                      type={col.type === "number" ? "number" : "text"}
+                      value={row[field] || ""}
+                      onChange={(e) => updateCell(idx, field, e.target.value)}
+                      style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white", ...(col.type === "number" ? { textAlign: "center" } : {}) }}
+                    />
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

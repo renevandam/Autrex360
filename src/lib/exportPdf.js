@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { loadAuditReportData, answerLabel, isActionItem, getActionItems, STATUS_LABEL } from "./auditReportData";
+import { getTableColumns } from "./tableColumns";
 
 const BRAND_BLUE = [11, 110, 193];   // #0B6EC1
 const BRAND_DARK = [9, 50, 90];      // #09325A
@@ -205,6 +206,7 @@ export async function exportAuditToPdf(auditId) {
 
       if (item.answer_type === "stock_take") {
         const rows = stockByItem[item.id] || [];
+        const tableColumns = getTableColumns(item);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(...GREY);
         doc.text(`${rows.length} row(s)`, pageWidth - margin - 140, y);
@@ -214,7 +216,8 @@ export async function exportAuditToPdf(auditId) {
           doc.setFont("helvetica", "normal");
           doc.setFontSize(9);
           doc.setTextColor(60, 60, 60);
-          doc.text(`   ${item.stock_col1_label || "Col1"}: ${r.col1_value || "—"}  ·  ${item.stock_col2_label || "Col2"}: ${r.col2_value || "—"}  ·  ${item.stock_col3_label || "Col3"}: ${r.col3_value || "—"}`, margin, y);
+          const line = tableColumns.map((col, ci) => `${col.label}: ${r[`col${ci + 1}_value`] || "—"}`).join("  ·  ");
+          doc.text(`   ${line}`, margin, y);
           y += 13;
         });
       } else {
