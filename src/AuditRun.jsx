@@ -221,6 +221,20 @@ function PhotoUpload({ auditId, itemId, required, onCountChange, note, onNoteCha
   );
 }
 
+// Wraps the first matching substring in a highlight, used to show where a search query hit a question's text
+function HighlightMatch({ text, query }) {
+  if (!query || !text) return text || null;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark style={{ background: "#FEF08A", color: "inherit", borderRadius: 2, padding: "0 1px" }}>{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 function InfoIcon({ text }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
@@ -502,6 +516,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [activeSectionId, setActiveSectionId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState(""); // filters/highlights questions across sections without touching the underlying structure
   const [collapsedSections, setCollapsedSections] = useState({}); // sectionId -> boolean
   const autoCollapsedOnce = useRef({}); // sectionId -> true once we've auto-collapsed it, so re-opening manually sticks
   const sectionRefs = useRef({});
@@ -724,12 +739,30 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const answered = countableItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "");
   const progress = countableItems.length > 0 ? Math.round((answered.length / countableItems.length) * 100) : 0;
 
-  // Per-section progress, used to drive the sticky nav bar checkmarks/counters
+  // True while a "photo required" question still has zero photos attached. Shared by submit
+  // validation and section-completeness checks, so a section can't count as "done" (and therefore
+  // can't auto-collapse, and the nav checkmark won't show) until its required photos are actually in.
+  function isMissingRequiredPhoto(i) {
+    return !!i.foto_verplicht && i.answer_type !== "signature" && i.answer_type !== "stock_take" && i.answer_type !== "datetime" && !(photoCounts[i.id] > 0);
+  }
+
+  // Per-section progress, used to drive the sticky nav bar checkmarks/counters and auto-collapse
   function sectionProgress(section) {
     const visibleItems = section.items.filter(isVisible).filter((i) => i.answer_type !== "signature" && i.answer_type !== "stock_take");
     if (visibleItems.length === 0) return { answered: 0, total: 0, complete: true };
     const ans = visibleItems.filter((i) => responses[i.id] !== undefined && responses[i.id] !== null && responses[i.id] !== "");
-    return { answered: ans.length, total: visibleItems.length, complete: ans.length === visibleItems.length };
+    const hasMissingPhoto = visibleItems.some(isMissingRequiredPhoto);
+    return { answered: ans.length, total: visibleItems.length, complete: ans.length === visibleItems.length && !hasMissingPhoto };
+  }
+
+  // Search: matches purely on question text, purely for display - never touches sections/items.
+  const searchQueryNorm = searchQuery.trim().toLowerCase();
+  const searchActive = searchQueryNorm.length > 0;
+  function itemMatchesSearch(item) {
+    return (item.label || "").toLowerCase().includes(searchQueryNorm) || (item.sub_label || "").toLowerCase().includes(searchQueryNorm);
+  }
+  function sectionHasSearchMatch(section) {
+    return searchActive && section.items.some((i) => isVisible(i) && itemMatchesSearch(i));
   }
 
   function scrollToSection(sectionId) {
@@ -746,7 +779,8 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
     setCollapsedSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
   }
 
-  // Auto-collapse a section the first time it becomes fully answered.
+  // Auto-collapse a section the first time it becomes fully answered (and, for questions with a
+  // required photo, once those photos are actually attached - see isMissingRequiredPhoto above).
   // Tracked via autoCollapsedOnce so manually re-opening it (e.g. to fix an answer) doesn't get immediately re-collapsed.
   // Debounced: a slider fires onChange continuously while being dragged, so without this delay a section
   // with just one slider question would collapse the instant you touch it instead of when you let go.
@@ -761,7 +795,18 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       });
     }, 600);
     return () => clearTimeout(timer);
-  }, [responses, sections]);
+  }, [responses, sections, photoCounts]);
+
+  // While searching, scroll to the first section with a matching question once typing settles
+  useEffect(() => {
+    if (!searchActive) return;
+    const timer = setTimeout(() => {
+      const firstMatch = sections.find((sec) => sectionHasSearchMatch(sec));
+      if (firstMatch) scrollToSection(firstMatch.id);
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, sections]);
 
   // Track which section is currently in view, to highlight it in the sticky nav
   useEffect(() => {
@@ -941,9 +986,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
     if (submitting) return;
 
     // Block submission while any visible "photo required" question still has zero photos
-    const missingPhotoItem = allItems.find(
-      (i) => i.foto_verplicht && i.answer_type !== "signature" && i.answer_type !== "stock_take" && i.answer_type !== "datetime" && !(photoCounts[i.id] > 0)
-    );
+    const missingPhotoItem = allItems.find(isMissingRequiredPhoto);
     if (missingPhotoItem) {
       setCollapsedSections((prev) => ({ ...prev, [missingPhotoItem.section_id]: false }));
       scrollToSection(missingPhotoItem.section_id);
@@ -1092,6 +1135,25 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
         <div style={{ height:3,background:"#1D9E75",width:progress+"%",transition:"width 0.3s" }} />
       </div>
 
+      {/* Question search */}
+      {sections.length > 0 && (
+        <div style={{ padding:"8px 1.25rem", borderBottom:"0.5px solid #eee", position:"relative" }}>
+          <i className="ti ti-search" style={{ position:"absolute", left:"1.75rem", top:"50%", transform:"translateY(-50%)", color:"#aaa", fontSize:13 }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search questions..."
+            style={{ width:"100%", border:"0.5px solid #ddd", borderRadius:8, padding:"7px 30px 7px 30px", fontSize:13, fontFamily:"inherit", boxSizing:"border-box" }}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} style={{ position:"absolute", right:"1.75rem", top:"50%", transform:"translateY(-50%)", border:"none", background:"none", color:"#aaa", cursor:"pointer", fontSize:15, padding:2, display:"flex" }}>
+              <i className="ti ti-x" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Sticky section navigation */}
       {sections.filter((sec) => sec.items.filter(isVisible).length > 0).length > 1 && (
         <div ref={navScrollRef} style={{ position:"sticky", top:0, zIndex:50, background:"white", borderBottom:"1px solid #eee", display:"flex", gap:6, padding:"8px 1.25rem", overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
@@ -1164,7 +1226,9 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
         if (visibleItems.length === 0) return null;
         const prog = sectionProgress(section);
         const score = sectionScore(section);
-        const collapsed = !!collapsedSections[section.id];
+        // A section with a search match is forced open while searching, without changing its actual
+        // collapsed/expanded state - clearing the search reverts it to exactly how it was before.
+        const collapsed = sectionHasSearchMatch(section) ? false : !!collapsedSections[section.id];
         return (
         <div key={section.id} ref={(el) => { sectionRefs.current[section.id] = el; }} style={sec}>
           <div style={{ ...secTitle, cursor:"pointer", justifyContent:"space-between" }} onClick={() => toggleSection(section.id)}>
@@ -1184,8 +1248,11 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
               <div key={item.id} style={{ padding:"10px 0",borderBottom:idx===visibleItems.length-1?"none":"0.5px solid #e8e8e8",paddingBottom:idx===visibleItems.length-1?0:10 }}>
                 {item.answer_type !== "signature" && (
                   <>
-                    <div style={{ fontSize:13,marginBottom:2 }}>{item.label}<InfoIcon text={item.info_text} /></div>
-                    {item.sub_label && <div style={{ fontSize:11,color:"#aaa" }}>{item.sub_label}</div>}
+                    <div style={{ fontSize:13,marginBottom:2 }}>
+                      {searchActive ? <HighlightMatch text={item.label} query={searchQuery} /> : item.label}
+                      <InfoIcon text={item.info_text} />
+                    </div>
+                    {item.sub_label && <div style={{ fontSize:11,color:"#aaa" }}>{searchActive ? <HighlightMatch text={item.sub_label} query={searchQuery} /> : item.sub_label}</div>}
                   </>
                 )}
                 {item.answer_type === "stock_take" ? (
