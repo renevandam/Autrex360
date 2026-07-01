@@ -424,7 +424,10 @@ function AnswerInput({ item, options, value, onChange }) {
   }
 
   if (type === "checkbox") {
-    const isNa = value === "na";
+    // Whether this checkbox may be marked N/A at all is a template setting (set in Dashboard), not
+    // something the auditor toggles per audit - so the N/A control only shows up when enabled there.
+    const naEnabled = !!item.checkbox_na_enabled;
+    const isNa = naEnabled && value === "na";
     return (
       <div style={{ marginTop: 8 }}>
         {!isNa && (
@@ -433,10 +436,12 @@ function AnswerInput({ item, options, value, onChange }) {
             <span style={{ fontSize:13,color:"#555" }}>Agree</span>
           </label>
         )}
-        <label style={{ display:"flex",alignItems:"center",gap:6,marginTop:isNa?0:8,cursor:"pointer" }}>
-          <input type="checkbox" checked={isNa} onChange={(e) => onChange(e.target.checked ? "na" : false)} style={{ width:14,height:14,accentColor:"#378ADD" }} />
-          <span style={{ fontSize:12,color:"#888" }}>Doesn't apply (N/A)</span>
-        </label>
+        {naEnabled && (
+          <label style={{ display:"flex",alignItems:"center",gap:6,marginTop:isNa?0:8,cursor:"pointer" }}>
+            <input type="checkbox" checked={isNa} onChange={(e) => onChange(e.target.checked ? "na" : false)} style={{ width:14,height:14,accentColor:"#378ADD" }} />
+            <span style={{ fontSize:12,color:"#888" }}>Doesn't apply (N/A)</span>
+          </label>
+        )}
       </div>
     );
   }
