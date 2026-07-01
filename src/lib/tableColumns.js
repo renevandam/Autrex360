@@ -33,3 +33,23 @@ export function emptyTableRow(rowOrder, columnCount) {
   for (let i = 0; i < columnCount; i++) row[`col${i + 1}_value`] = "";
   return row;
 }
+
+// Which row positions (0-based) are required, stored as a boolean array (table_required_rows) on
+// the template item. Padded/truncated to the current row count so a later change to "max rows"
+// never leaves a stale flag pointing past the end.
+export function getRequiredRows(item, rowCount) {
+  const stored = Array.isArray(item?.table_required_rows) ? item.table_required_rows : [];
+  const result = [];
+  for (let i = 0; i < rowCount; i++) result.push(!!stored[i]);
+  return result;
+}
+
+// A required row must have every one of its configured columns filled in - a half-filled
+// "mandatory" row still blocks submission.
+export function isTableRowComplete(row, columnCount) {
+  for (let i = 0; i < columnCount; i++) {
+    const v = row?.[`col${i + 1}_value`];
+    if (v === undefined || v === null || String(v).trim() === "") return false;
+  }
+  return true;
+}

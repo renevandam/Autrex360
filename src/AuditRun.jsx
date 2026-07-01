@@ -5,7 +5,7 @@ import { exportAuditToPrintForm } from "./lib/exportPrintForm";
 import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, queueNote, countPending } from "./lib/offlineStore";
 import { syncAuditToServer } from "./lib/offlineSync";
 import { uploadAuditPhoto, getPhotosForItem, deleteAuditPhoto } from "./lib/photoStorage";
-import { getTableColumns, getTableMaxRows, emptyTableRow, MAX_TABLE_COLUMNS } from "./lib/tableColumns";
+import { getTableColumns, getTableMaxRows, emptyTableRow, getRequiredRows, isTableRowComplete, MAX_TABLE_COLUMNS } from "./lib/tableColumns";
 
 function pctColor(pct) {
   if (pct < 20) return "#A32D2D";
@@ -259,13 +259,23 @@ function InfoIcon({ text }) {
   );
 }
 
-function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOnline }) {
+function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOnline, onRequiredRowsStatus }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const columns = getTableColumns(item); // 1-5 {label, type} entries, falls back to legacy col1/2/3 for older items
   const maxRows = getTableMaxRows(item);
+  const requiredRows = getRequiredRows(item, maxRows); // boolean per row position, set in the template editor
   const saveTimers = useRef({});
   const pendingValues = useRef({}); // rowIdx -> latest {field: value} not yet flushed
+
+  // Report up to the parent whether every required row is currently fully filled in, so
+  // handleSubmit can block submission the same way it does for required photos.
+  useEffect(() => {
+    if (!onRequiredRowsStatus) return;
+    const allSatisfied = requiredRows.every((req, idx) => !req || isTableRowComplete(rows[idx], columns.length));
+    onRequiredRowsStatus(item.id, allSatisfied);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, item.id]);
 
   useEffect(() => {
     async function load() {
@@ -331,31 +341,46 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
+            <th style={{ width: 14, borderBottom: "0.5px solid #eee" }}></th>
             {columns.map((col, i) => (
               <th key={i} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>{col.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
-            <tr key={idx}>
-              {columns.map((col, ci) => {
-                const field = `col${ci + 1}_value`;
-                return (
-                  <td key={ci} style={{ padding: "4px 4px", ...(col.type === "number" ? { width: 90 } : {}) }}>
-                    <input
-                      type={col.type === "number" ? "number" : "text"}
-                      value={row[field] || ""}
-                      onChange={(e) => updateCell(idx, field, e.target.value)}
-                      style={{ width: "100%", border: "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white", ...(col.type === "number" ? { textAlign: "center" } : {}) }}
-                    />
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {rows.map((row, idx) => {
+            const required = !!requiredRows[idx];
+            const complete = isTableRowComplete(row, columns.length);
+            return (
+              <tr key={idx} style={required && !complete ? { background: "#FDEDEC" } : undefined}>
+                <td style={{ textAlign: "center", padding: "4px 0" }} title={required ? (complete ? "Required row - complete" : "Required row - missing values") : undefined}>
+                  {required && (
+                    <i className={complete ? "ti ti-circle-check" : "ti ti-alert-circle"} style={{ fontSize: 13, color: complete ? "#1D9E75" : "#E24B4A" }} />
+                  )}
+                </td>
+                {columns.map((col, ci) => {
+                  const field = `col${ci + 1}_value`;
+                  return (
+                    <td key={ci} style={{ padding: "4px 4px", ...(col.type === "number" ? { width: 90 } : {}) }}>
+                      <input
+                        type={col.type === "number" ? "number" : "text"}
+                        value={row[field] || ""}
+                        onChange={(e) => updateCell(idx, field, e.target.value)}
+                        style={{ width: "100%", border: required && !complete ? "0.5px solid #E24B4A" : "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white", ...(col.type === "number" ? { textAlign: "center" } : {}) }}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      {requiredRows.some(Boolean) && (
+        <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>
+          <i className="ti ti-alert-circle" style={{ color: "#E24B4A" }} /> Row must be fully filled in before submitting
+        </div>
+      )}
     </div>
   );
 }
@@ -494,6 +519,7 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
   const [responses, setResponses] = useState({});
   const [notes, setNotes] = useState({}); // itemId -> free-text note added alongside the answer
   const [photoCounts, setPhotoCounts] = useState({}); // itemId -> number of uploaded photos, used to enforce "photo required" questions
+  const [tableRowStatus, setTableRowStatus] = useState({}); // itemId -> true once every required row of that Table question is fully filled in
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("audit");
   const [addrVerified, setAddrVerified] = useState(false);
@@ -981,6 +1007,15 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
       return;
     }
 
+    // Block submission while any Table question still has an incomplete required row
+    const missingTableItem = allItems.find((i) => i.answer_type === "stock_take" && tableRowStatus[i.id] === false);
+    if (missingTableItem) {
+      setCollapsedSections((prev) => ({ ...prev, [missingTableItem.section_id]: false }));
+      scrollToSection(missingTableItem.section_id);
+      alert(`One or more required rows in "${missingTableItem.label}" are not fully filled in. Please complete them before submitting.`);
+      return;
+    }
+
     setSubmitting(true);
     if (auditId) {
       // Check whether this organization requires QA approval before an audit counts as fully done
@@ -1248,7 +1283,9 @@ export default function AuditRun({ session, profile, auditId, locationId, templa
                     saveTimers.current.__snapshotRefresh = setTimeout(() => {
                       setResponses((current) => { refreshSnapshotIfExists(current); return current; });
                     }, 800);
-                  }} />
+                  }}
+                    onRequiredRowsStatus={(id, ok) => setTableRowStatus((s) => (s[id] === ok ? s : { ...s, [id]: ok }))}
+                  />
                 ) : (
                   <AnswerInput
                     item={item}
