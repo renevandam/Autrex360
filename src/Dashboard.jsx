@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { exportAuditToPdf } from "./lib/exportPdf";
 import { exportAuditToPrintForm } from "./lib/exportPrintForm";
-import { getTableColumns, getRequiredRows, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS } from "./lib/tableColumns";
+import { getTableColumns, getRequiredRows, getRequiredColumns, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS } from "./lib/tableColumns";
 
 const NAV = [
   { id: "home",       label: "Dashboard",   icon: "ti-home" },
@@ -55,7 +55,7 @@ const s = {
 };
 
 // ── Table question column editor (used by both the "new question" and "edit question" forms) ──
-function TableColumnsEditor({ columns, maxRows, requiredRows, onColumnsChange, onMaxRowsChange, onRequiredRowsChange }) {
+function TableColumnsEditor({ columns, maxRows, requiredRows, requiredColumns, onColumnsChange, onMaxRowsChange, onRequiredRowsChange, onRequiredColumnsChange }) {
   const cols = columns && columns.length > 0 ? columns : [{ label: "", type: "text" }];
   const rowCount = Math.min(MAX_TABLE_ROWS, Math.max(1, parseInt(maxRows, 10) || 5));
 
@@ -75,10 +75,17 @@ function TableColumnsEditor({ columns, maxRows, requiredRows, onColumnsChange, o
     for (let i = 0; i < rowCount; i++) next.push(i === idx ? checked : !!(requiredRows && requiredRows[i]));
     onRequiredRowsChange(next);
   }
+  function toggleRequiredColumn(idx, checked) {
+    const hasStoredValues = requiredColumns && requiredColumns.length > 0;
+    const next = [];
+    for (let i = 0; i < cols.length; i++) next.push(i === idx ? checked : (hasStoredValues ? !!requiredColumns[i] : true));
+    onRequiredColumnsChange(next);
+  }
 
   return (
     <>
       <div style={{ ...s.label, marginTop: 8 }}>Columns (max {MAX_TABLE_COLUMNS})</div>
+      <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>"Required" means: this column must be filled in whenever its row is a required row. Uncheck it for columns that aren't always applicable (e.g. a serial number not every item has).</div>
       {cols.map((col, idx) => (
         <div key={idx} style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
           <input value={col.label} onChange={(e) => updateCol(idx, "label", e.target.value)} style={{ ...s.input, marginTop: 0, flex: 1 }} placeholder={`Column ${idx + 1} name`} />
@@ -86,6 +93,10 @@ function TableColumnsEditor({ columns, maxRows, requiredRows, onColumnsChange, o
             <option value="text">Text</option>
             <option value="number">Number</option>
           </select>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#888", cursor: "pointer", flexShrink: 0 }} title="This column must be filled in when its row is required">
+            <input type="checkbox" checked={requiredColumns && requiredColumns.length > 0 ? !!requiredColumns[idx] : true} onChange={(e) => toggleRequiredColumn(idx, e.target.checked)} style={{ width: 13, height: 13, accentColor: "#1D9E75" }} />
+            Req.
+          </label>
           {cols.length > 1 && (
             <button onClick={() => removeCol(idx)} style={{ fontSize: 13, color: "#ccc", border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}><i className="ti ti-x" /></button>
           )}
@@ -98,7 +109,7 @@ function TableColumnsEditor({ columns, maxRows, requiredRows, onColumnsChange, o
       <input type="number" min="1" max={MAX_TABLE_ROWS} value={maxRows} onChange={(e) => onMaxRowsChange(e.target.value)} style={s.input} />
 
       <div style={{ ...s.label, marginTop: 10 }}>Required rows</div>
-      <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>A required row must be fully filled in (every column) before the audit can be submitted.</div>
+      <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>A required row must be fully filled in (every column marked "Req." above) before the audit can be submitted.</div>
       {Array.from({ length: rowCount }).map((_, i) => (
         <label key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, cursor: "pointer" }}>
           <input type="checkbox" checked={!!(requiredRows && requiredRows[i])} onChange={(e) => toggleRequiredRow(i, e.target.checked)} style={{ width: 14, height: 14, accentColor: "#1D9E75" }} />
@@ -761,7 +772,7 @@ function TemplateDetail({ template, canManage, onBack }) {
     await load();
   }
 
-  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", table_columns: [{ label: "Item number", type: "text" }, { label: "Bin location", type: "text" }, { label: "Quantity", type: "number" }], stock_max_rows: "5", table_required_rows: [], datetime_mode: "date", foto_verplicht: false };
+  const defaultItemForm = { label: "", sub_label: "", info_text: "", answer_type: "score", answer_set_id: "", weight: "1", depends_on_item_id: "", depends_on_value: "", table_columns: [{ label: "Item number", type: "text" }, { label: "Bin location", type: "text" }, { label: "Quantity", type: "number" }], stock_max_rows: "5", table_required_rows: [], table_required_columns: [], datetime_mode: "date", foto_verplicht: false };
 
   // Photo upload only applies to question types that actually render the PhotoUpload control in AuditRun
   function supportsPhoto(answerType) {
@@ -804,6 +815,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       table_columns: form.answer_type === "stock_take" ? (form.table_columns || defaultItemForm.table_columns) : null,
       stock_max_rows: form.stock_max_rows ? Math.min(MAX_TABLE_ROWS, Math.max(1, parseInt(form.stock_max_rows))) : 5,
       table_required_rows: form.answer_type === "stock_take" ? (form.table_required_rows || []) : null,
+      table_required_columns: form.answer_type === "stock_take" ? (form.table_required_columns || []) : null,
       datetime_mode: form.datetime_mode || "date",
       foto_verplicht: supportsPhoto(form.answer_type) ? !!form.foto_verplicht : false,
       sort_order: (items[sectionId] || []).length,
@@ -839,6 +851,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       table_columns: getTableColumns(item),
       stock_max_rows: item.stock_max_rows !== null && item.stock_max_rows !== undefined ? String(item.stock_max_rows) : "5",
       table_required_rows: getRequiredRows(item, Math.min(MAX_TABLE_ROWS, Math.max(1, parseInt(item.stock_max_rows, 10) || 5))),
+      table_required_columns: getRequiredColumns(item, getTableColumns(item).length),
       datetime_mode: item.datetime_mode || "date",
       foto_verplicht: !!item.foto_verplicht,
       _sectionId: item.section_id,
@@ -859,6 +872,7 @@ function TemplateDetail({ template, canManage, onBack }) {
       table_columns: editForm.answer_type === "stock_take" ? (editForm.table_columns || null) : null,
       stock_max_rows: editForm.stock_max_rows ? Math.min(MAX_TABLE_ROWS, Math.max(1, parseInt(editForm.stock_max_rows))) : 5,
       table_required_rows: editForm.answer_type === "stock_take" ? (editForm.table_required_rows || []) : null,
+      table_required_columns: editForm.answer_type === "stock_take" ? (editForm.table_required_columns || []) : null,
       datetime_mode: editForm.datetime_mode || "date",
       foto_verplicht: supportsPhoto(editForm.answer_type) ? !!editForm.foto_verplicht : false,
     }).eq("id", editingItemId);
@@ -928,9 +942,11 @@ function TemplateDetail({ template, canManage, onBack }) {
                           columns={editForm.table_columns}
                           maxRows={editForm.stock_max_rows}
                           requiredRows={editForm.table_required_rows}
+                          requiredColumns={editForm.table_required_columns}
                           onColumnsChange={(cols) => setEditForm((f) => ({ ...f, table_columns: cols }))}
                           onMaxRowsChange={(v) => setEditForm((f) => ({ ...f, stock_max_rows: v }))}
                           onRequiredRowsChange={(rows) => setEditForm((f) => ({ ...f, table_required_rows: rows }))}
+                          onRequiredColumnsChange={(cols) => setEditForm((f) => ({ ...f, table_required_columns: cols }))}
                         />
                       )}
                       {editForm.answer_type === "datetime" && (
@@ -1040,9 +1056,11 @@ function TemplateDetail({ template, canManage, onBack }) {
                       columns={newItemForms[section.id]?.table_columns ?? defaultItemForm.table_columns}
                       maxRows={newItemForms[section.id]?.stock_max_rows ?? "5"}
                       requiredRows={newItemForms[section.id]?.table_required_rows ?? []}
+                      requiredColumns={newItemForms[section.id]?.table_required_columns ?? []}
                       onColumnsChange={(cols) => updateItemForm(section.id, "table_columns", cols)}
                       onMaxRowsChange={(v) => updateItemForm(section.id, "stock_max_rows", v)}
                       onRequiredRowsChange={(rows) => updateItemForm(section.id, "table_required_rows", rows)}
+                      onRequiredColumnsChange={(cols) => updateItemForm(section.id, "table_required_columns", cols)}
                     />
                   )}
                   {newItemForms[section.id]?.answer_type === "datetime" && (

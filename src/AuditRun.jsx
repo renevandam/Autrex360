@@ -5,7 +5,7 @@ import { exportAuditToPrintForm } from "./lib/exportPrintForm";
 import { saveAuditSnapshot, getAuditSnapshot, queueResponse, queueStockRow, queueNote, countPending } from "./lib/offlineStore";
 import { syncAuditToServer } from "./lib/offlineSync";
 import { uploadAuditPhoto, getPhotosForItem, deleteAuditPhoto } from "./lib/photoStorage";
-import { getTableColumns, getTableMaxRows, emptyTableRow, getRequiredRows, isTableRowComplete, MAX_TABLE_COLUMNS } from "./lib/tableColumns";
+import { getTableColumns, getTableMaxRows, emptyTableRow, getRequiredRows, getRequiredColumns, isTableRowComplete, MAX_TABLE_COLUMNS } from "./lib/tableColumns";
 
 function pctColor(pct) {
   if (pct < 20) return "#A32D2D";
@@ -265,6 +265,7 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
   const columns = getTableColumns(item); // 1-5 {label, type} entries, falls back to legacy col1/2/3 for older items
   const maxRows = getTableMaxRows(item);
   const requiredRows = getRequiredRows(item, maxRows); // boolean per row position, set in the template editor
+  const requiredColumns = getRequiredColumns(item, columns.length); // boolean per column, applies within a required row
   const saveTimers = useRef({});
   const pendingValues = useRef({}); // rowIdx -> latest {field: value} not yet flushed
 
@@ -272,7 +273,7 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
   // handleSubmit can block submission the same way it does for required photos.
   useEffect(() => {
     if (!onRequiredRowsStatus) return;
-    const allSatisfied = requiredRows.every((req, idx) => !req || isTableRowComplete(rows[idx], columns.length));
+    const allSatisfied = requiredRows.every((req, idx) => !req || isTableRowComplete(rows[idx], columns.length, requiredColumns));
     onRequiredRowsStatus(item.id, allSatisfied);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, item.id]);
@@ -343,14 +344,16 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
           <tr>
             <th style={{ width: 14, borderBottom: "0.5px solid #eee" }}></th>
             {columns.map((col, i) => (
-              <th key={i} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>{col.label}</th>
+              <th key={i} style={{ fontSize: 10, fontWeight: 500, color: "#aaa", textAlign: "left", padding: "5px 6px", borderBottom: "0.5px solid #eee" }}>
+                {col.label}{requiredRows.some(Boolean) && !requiredColumns[i] && <span style={{ fontWeight: 400, color: "#ccc" }}> (optional)</span>}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, idx) => {
             const required = !!requiredRows[idx];
-            const complete = isTableRowComplete(row, columns.length);
+            const complete = isTableRowComplete(row, columns.length, requiredColumns);
             return (
               <tr key={idx} style={required && !complete ? { background: "#FDEDEC" } : undefined}>
                 <td style={{ textAlign: "center", padding: "4px 0" }} title={required ? (complete ? "Required row - complete" : "Required row - missing values") : undefined}>
@@ -360,13 +363,14 @@ function StockTakeTable({ item, auditId, isOffline, snapshotStockRows, onSavedOn
                 </td>
                 {columns.map((col, ci) => {
                   const field = `col${ci + 1}_value`;
+                  const cellMissing = required && requiredColumns[ci] && !String(row[field] || "").trim();
                   return (
                     <td key={ci} style={{ padding: "4px 4px", ...(col.type === "number" ? { width: 90 } : {}) }}>
                       <input
                         type={col.type === "number" ? "number" : "text"}
                         value={row[field] || ""}
                         onChange={(e) => updateCell(idx, field, e.target.value)}
-                        style={{ width: "100%", border: required && !complete ? "0.5px solid #E24B4A" : "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white", ...(col.type === "number" ? { textAlign: "center" } : {}) }}
+                        style={{ width: "100%", border: cellMissing ? "0.5px solid #E24B4A" : "0.5px solid #ddd", borderRadius: 5, padding: "5px 7px", fontSize: 12, background: "white", ...(col.type === "number" ? { textAlign: "center" } : {}) }}
                       />
                     </td>
                   );

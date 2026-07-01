@@ -44,10 +44,28 @@ export function getRequiredRows(item, rowCount) {
   return result;
 }
 
-// A required row must have every one of its configured columns filled in - a half-filled
-// "mandatory" row still blocks submission.
-export function isTableRowComplete(row, columnCount) {
+// Which column positions (0-based) must be filled in whenever their row is required, stored as a
+// boolean array (table_required_columns) on the template item. Not-yet-configured items (the array
+// doesn't exist at all) default every column to required, preserving the original behavior where a
+// required row meant "every column must be filled in". Once a template owner opens the editor and
+// unchecks a column (e.g. an optional "Serial number" not every item has), that choice is stored
+// explicitly; any column added later that isn't in the stored array yet defaults to optional,
+// matching getRequiredRows' padding behavior.
+export function getRequiredColumns(item, columnCount) {
+  // An empty array is treated the same as "not configured" - it's what a never-touched stock_take
+  // item gets persisted with, and should still default to "all columns required".
+  const stored = Array.isArray(item?.table_required_columns) && item.table_required_columns.length > 0 ? item.table_required_columns : null;
+  const result = [];
+  for (let i = 0; i < columnCount; i++) result.push(stored ? !!stored[i] : true);
+  return result;
+}
+
+// A required row must have every one of its required columns filled in - columns explicitly marked
+// optional (via requiredColumns) are skipped. Without a requiredColumns array, every column is
+// checked (the original all-columns-required behavior).
+export function isTableRowComplete(row, columnCount, requiredColumns) {
   for (let i = 0; i < columnCount; i++) {
+    if (requiredColumns && !requiredColumns[i]) continue;
     const v = row?.[`col${i + 1}_value`];
     if (v === undefined || v === null || String(v).trim() === "") return false;
   }
