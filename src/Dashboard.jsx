@@ -712,6 +712,13 @@ function TemplateDetail({ template, canManage, onBack }) {
     return answerType !== "signature" && answerType !== "stock_take" && answerType !== "datetime";
   }
 
+  // Weight only affects the score for types AuditRun actually includes in its scoring: score
+  // questions (buttons/slider answer set) and checkbox. Everything else (text, number, datetime,
+  // the standalone slider, signature, stock_take) is ignored by the score calculation entirely.
+  function countsTowardScore(answerType) {
+    return !answerType || answerType === "score" || answerType === "checkbox";
+  }
+
   function toggleItemForm(sectionId) {
     setNewItemForms((f) => ({ ...f, [sectionId]: { ...defaultItemForm, ...(f[sectionId] || {}), open: !f[sectionId]?.open } }));
   }
@@ -882,8 +889,12 @@ function TemplateDetail({ template, canManage, onBack }) {
                           </select>
                         </>
                       )}
-                      <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
-                      <input type="number" step="0.5" min="0.5" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                      {countsTowardScore(editForm.answer_type) && (
+                        <>
+                          <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
+                          <input type="number" step="0.5" min="0.5" value={editForm.weight} onChange={(e) => setEditForm((f) => ({ ...f, weight: e.target.value }))} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                        </>
+                      )}
                       {supportsPhoto(editForm.answer_type) && (
                         <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
                           <input type="checkbox" checked={!!editForm.foto_verplicht} onChange={(e) => setEditForm((f) => ({ ...f, foto_verplicht: e.target.checked }))} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
@@ -992,8 +1003,12 @@ function TemplateDetail({ template, canManage, onBack }) {
                       </select>
                     </>
                   )}
-                  <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
-                  <input type="number" step="0.5" min="0.5" value={newItemForms[section.id]?.weight || "1"} onChange={(e) => updateItemForm(section.id, "weight", e.target.value)} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                  {countsTowardScore(newItemForms[section.id]?.answer_type) && (
+                    <>
+                      <div style={{ ...s.label, marginTop: 8 }}>Weight</div>
+                      <input type="number" step="0.5" min="0.5" value={newItemForms[section.id]?.weight || "1"} onChange={(e) => updateItemForm(section.id, "weight", e.target.value)} style={s.input} placeholder="1 = normal, 2 = double importance" />
+                    </>
+                  )}
                   {supportsPhoto(newItemForms[section.id]?.answer_type || "score") && (
                     <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
                       <input type="checkbox" checked={!!newItemForms[section.id]?.foto_verplicht} onChange={(e) => updateItemForm(section.id, "foto_verplicht", e.target.checked)} style={{ width: 15, height: 15, accentColor: "#1D9E75" }} />
