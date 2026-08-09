@@ -7,6 +7,7 @@ export default function ResetPassword({ forced }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [flagWarning, setFlagWarning] = useState(false);
   const [ready, setReady] = useState(!!forced); // already have a session if we got here via the forced app flow
 
   // Supabase puts the recovery token in the URL hash and exchanges it for a
@@ -29,11 +30,28 @@ export default function ResetPassword({ forced }) {
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (password !== confirm) { setError("Passwords do not match."); return; }
     setLoading(true);
-    const { data: userData, error } = await supabase.auth.updateUser({ password });
+
+    // Record the moment in the user's own auth metadata at the same time as the
+    // password change. Metadata is always writable by the user themselves, so
+    // this cannot be blocked by a row-level security policy. App.jsx treats it
+    // as proof that a password was set, which makes the forced-change screen
+    // impossible to get stuck in.
+    const { data: userData, error } = await supabase.auth.updateUser({
+      password,
+      data: { password_set_at: new Date().toISOString() },
+    });
+
     if (!error && userData?.user?.id) {
-      // Clear the forced-change flag now that a real password has been set
-      await supabase.from("user_profiles").update({ must_change_password: false }).eq("id", userData.user.id);
+      // Clear the forced-change flag now that a real password has been set.
+      // This can fail if RLS forbids the user updating their own profile row;
+      // that's worth surfacing, but it must never block the user.
+      const { error: flagError } = await supabase
+        .from("user_profiles")
+        .update({ must_change_password: false })
+        .eq("id", userData.user.id);
+      if (flagError) setFlagWarning(true);
     }
+
     setLoading(false);
     if (error) { setError(error.message); return; }
     setSuccess(true);
@@ -65,6 +83,11 @@ export default function ResetPassword({ forced }) {
           <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>
             {forced ? "You will now continue to your environment." : "You can now log in with your new password."}
           </div>
+          {flagWarning && (
+            <div style={{ fontSize: 12, color: "#8A6D3B", background: "#FCF8E3", border: "1px solid #E8D9A0", borderRadius: 8, padding: "8px 12px", marginBottom: 16, textAlign: "left" }}>
+              <i className="ti ti-alert-triangle" /> Je wachtwoord is opgeslagen, maar de profielstatus kon niet worden bijgewerkt. Meld dit aan je beheerder als je dit scherm opnieuw ziet.
+            </div>
+          )}
           {forced ? (
             <button onClick={() => window.location.href = "/"} style={{ padding: "9px 18px", background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
               <i className="ti ti-arrow-right" /> Continue
